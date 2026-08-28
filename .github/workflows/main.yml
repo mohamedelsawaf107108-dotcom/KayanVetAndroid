@@ -1,12 +1,13 @@
-name: Build Kayan Vet Back Logout Fixed APK
+name: Build Kayan Vet Firebase Final APK
 
 on:
   workflow_dispatch:
+
   push:
     branches:
       - main
     paths:
-      - 'KayanVetAndroid_V2_BACK_LOGOUT_FIXED.zip'
+      - 'KayanVetAndroid_V2_FIREBASE_FINAL.zip'
       - '.github/workflows/main.yml'
 
 jobs:
@@ -23,7 +24,7 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Extract Kayan Vet Project
+      - name: Extract Android project
         shell: bash
         run: |
           set -e
@@ -31,12 +32,9 @@ jobs:
           rm -rf extracted
           mkdir -p extracted
 
-          unzip -q "KayanVetAndroid_V2_BACK_LOGOUT_FIXED.zip" -d extracted
+          unzip -q "KayanVetAndroid_V2_FIREBASE_FINAL.zip" -d extracted
 
-          echo "Project extracted successfully"
-          find extracted -maxdepth 4 -type f | head -100
-
-      - name: Find Android Project
+      - name: Find Android project
         id: project
         shell: bash
         run: |
@@ -50,26 +48,38 @@ jobs:
 
           if [ -z "$PROJECT_DIR" ]; then
             echo "Android project not found"
-            find extracted -maxdepth 5 -type f
             exit 1
           fi
 
-          echo "Project found: $PROJECT_DIR"
+          echo "Android project found at: $PROJECT_DIR"
           echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Check Firebase configuration
+        shell: bash
+        run: |
+          set -e
+
+          if [ ! -f "${{ steps.project.outputs.dir }}/app/google-services.json" ]; then
+            echo "google-services.json not found"
+            exit 1
+          fi
+
+          echo "Firebase configuration found"
 
       - name: Set up Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
 
-      - name: Build APK
+      - name: Build debug APK
         shell: bash
         working-directory: ${{ steps.project.outputs.dir }}
         run: |
           set -e
           gradle assembleDebug --stacktrace
 
-      - name: Prepare APK
+      - name: Find generated APK
+        id: apk
         shell: bash
         run: |
           set -e
@@ -85,17 +95,23 @@ jobs:
             exit 1
           fi
 
+          echo "APK found at: $APK"
+          echo "path=$APK" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare APK
+        shell: bash
+        run: |
+          set -e
+
           mkdir -p apk-output
 
-          cp "$APK" "apk-output/Kayan-Vet-Hospital-Back-Logout-Fixed.apk"
-
-          echo "APK READY:"
-          ls -lh apk-output/
+          cp "${{ steps.apk.outputs.path }}" \
+          "apk-output/Kayan-Vet-Hospital-Firebase-V2.2.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kayan-Vet-Hospital-Back-Logout-Fixed-APK
-          path: apk-output/Kayan-Vet-Hospital-Back-Logout-Fixed.apk
+          name: Kayan-Vet-Hospital-Firebase-V2.2-APK
+          path: apk-output/Kayan-Vet-Hospital-Firebase-V2.2.apk
           if-no-files-found: error
           retention-days: 30
