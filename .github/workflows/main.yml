@@ -39,9 +39,11 @@ jobs:
           echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
           echo "Android project: $PROJECT_DIR"
 
-      - name: Make Gradle executable
+      - name: Prepare Gradle wrapper
         working-directory: ${{ steps.project.outputs.dir }}
-        run: chmod +x gradlew
+        run: |
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
 
       - name: Build APK
         working-directory: ${{ steps.project.outputs.dir }}
