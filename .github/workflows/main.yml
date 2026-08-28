@@ -20,13 +20,20 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Extract Android project
+        run: |
+          mkdir -p extracted
+          unzip -q "KayanVetAndroid_ANDROIDIDE_FIXED-1.zip" -d extracted
+          echo "Project extracted"
+          find extracted -maxdepth 3 -type f | head -50
+
       - name: Find Android project
         id: project
         shell: bash
         run: |
-          PROJECT_DIR=$(find . -type f -name "settings.gradle" -printf '%h\n' | head -n 1)
+          PROJECT_DIR=$(find extracted -type f -name "settings.gradle" -printf '%h\n' | head -n 1)
           if [ -z "$PROJECT_DIR" ]; then
-            echo "Android project not found"
+            echo "Android project not found after extraction"
             exit 1
           fi
           echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
@@ -38,10 +45,10 @@ jobs:
 
       - name: Build APK
         working-directory: ${{ steps.project.outputs.dir }}
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kayan-Vet-Android
+          name: Kayan-Vet-Hospital-APK
           path: ${{ steps.project.outputs.dir }}/app/build/outputs/apk/debug/*.apk
