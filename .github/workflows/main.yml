@@ -1,4 +1,4 @@
-name: Build Kayan Vet V2 APK
+name: Build Kayan Vet V2 Roles APK
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
     branches:
       - main
     paths:
-      - 'KayanVetAndroid_V2_PLAY_READY.zip'
+      - 'KayanVetAndroid_V2_ROLES_FIXED.zip'
       - '.github/workflows/main.yml'
 
 jobs:
@@ -23,14 +23,14 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Extract Kayan Vet V2
+      - name: Extract Kayan Vet V2 Roles
         shell: bash
         run: |
           set -e
           rm -rf extracted
           mkdir -p extracted
-          unzip -q "KayanVetAndroid_V2_PLAY_READY.zip" -d extracted
-          echo "Kayan Vet V2 extracted successfully"
+          unzip -q "KayanVetAndroid_V2_ROLES_FIXED.zip" -d extracted
+          echo "Kayan Vet V2 Roles extracted successfully"
           find extracted -maxdepth 4 -type f | head -100
 
       - name: Find Android project
@@ -59,7 +59,7 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      - name: Build Kayan Vet V2 APK
+      - name: Build Kayan Vet V2 Roles APK
         shell: bash
         working-directory: ${{ steps.project.outputs.dir }}
         run: |
@@ -83,15 +83,15 @@ jobs:
           fi
 
           mkdir -p apk-output
-          cp "$APK" "apk-output/Kayan-Vet-Hospital-V2.apk"
+          cp "$APK" "apk-output/Kayan-Vet-Hospital-V2-Roles.apk"
 
           echo "APK READY:"
           ls -lh apk-output/
 
-      - name: Upload Kayan Vet V2 APK
+      - name: Upload Kayan Vet V2 Roles APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kayan-Vet-Hospital-V2-APK
-          path: apk-output/Kayan-Vet-Hospital-V2.apk
+          name: Kayan-Vet-Hospital-V2-Roles-APK
+          path: apk-output/Kayan-Vet-Hospital-V2-Roles.apk
           if-no-files-found: error
           retention-days: 30
