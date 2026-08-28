@@ -1,4 +1,4 @@
-name: Build Kayan Vet V2 Roles APK
+name: Build Kayan Vet V2 Back Fixed APK
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
     branches:
       - main
     paths:
-      - 'KayanVetAndroid_V2_ROLES_FIXED.zip'
+      - 'KayanVetAndroid_V2_BACK_FIXED.zip'
       - '.github/workflows/main.yml'
 
 jobs:
@@ -23,17 +23,21 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Extract Kayan Vet V2 Roles
+      - name: Extract Kayan Vet Android Project
         shell: bash
         run: |
           set -e
+
           rm -rf extracted
           mkdir -p extracted
-          unzip -q "KayanVetAndroid_V2_ROLES_FIXED.zip" -d extracted
-          echo "Kayan Vet V2 Roles extracted successfully"
+
+          unzip -q "KayanVetAndroid_V2_BACK_FIXED.zip" -d extracted
+
+          echo "Project extracted successfully"
+
           find extracted -maxdepth 4 -type f | head -100
 
-      - name: Find Android project
+      - name: Find Android Project
         id: project
         shell: bash
         run: |
@@ -51,22 +55,29 @@ jobs:
             exit 1
           fi
 
-          echo "Project found: $PROJECT_DIR"
+          echo "Android Project Found:"
+          echo "$PROJECT_DIR"
+
           echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
 
-      - name: Set up Gradle
+      - name: Set up Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
 
-      - name: Build Kayan Vet V2 Roles APK
+      - name: Build Kayan Vet APK
         shell: bash
         working-directory: ${{ steps.project.outputs.dir }}
         run: |
           set -e
+
+          echo "Starting Kayan Vet Hospital APK build..."
+
           gradle assembleDebug --stacktrace
 
-      - name: Prepare APK
+          echo "Build completed"
+
+      - name: Find and Prepare APK
         shell: bash
         run: |
           set -e
@@ -82,16 +93,20 @@ jobs:
             exit 1
           fi
 
+          echo "APK found:"
+          echo "$APK"
+
           mkdir -p apk-output
-          cp "$APK" "apk-output/Kayan-Vet-Hospital-V2-Roles.apk"
+
+          cp "$APK" "apk-output/Kayan-Vet-Hospital-V2-Back-Fixed.apk"
 
           echo "APK READY:"
           ls -lh apk-output/
 
-      - name: Upload Kayan Vet V2 Roles APK
+      - name: Upload Kayan Vet APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kayan-Vet-Hospital-V2-Roles-APK
-          path: apk-output/Kayan-Vet-Hospital-V2-Roles.apk
+          name: Kayan-Vet-Hospital-V2-Back-Fixed-APK
+          path: apk-output/Kayan-Vet-Hospital-V2-Back-Fixed.apk
           if-no-files-found: error
           retention-days: 30
