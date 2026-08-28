@@ -1,0 +1,47 @@
+name: Build Kayan Vet APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Find Android project
+        id: project
+        shell: bash
+        run: |
+          PROJECT_DIR=$(find . -type f -name "settings.gradle" -printf '%h\n' | head -n 1)
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "Android project not found"
+            exit 1
+          fi
+          echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+          echo "Android project: $PROJECT_DIR"
+
+      - name: Make Gradle executable
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: chmod +x gradlew
+
+      - name: Build APK
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kayan-Vet-Android
+          path: ${{ steps.project.outputs.dir }}/app/build/outputs/apk/debug/*.apk
