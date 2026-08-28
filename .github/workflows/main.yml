@@ -1,10 +1,13 @@
-name: Build Kayan Vet APK
+name: Build Kayan Vet Mobile APK
 
 on:
   workflow_dispatch:
   push:
     branches:
       - main
+    paths:
+      - 'KayanVetAndroid_MOBILE_HTML_FIXED.zip'
+      - '.github/workflows/main.yml'
 
 jobs:
   build:
@@ -20,52 +23,70 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Extract Android project
+      - name: Extract mobile Android project
+        shell: bash
         run: |
-          mkdir -p extracted
-          unzip -q "KayanVetAndroid_ANDROIDIDE_FIXED-1.zip" -d extracted
-          echo "Project extracted"
+          set -e
+          rm -rf extracted
+          mkdir extracted
+          unzip -q "KayanVetAndroid_MOBILE_HTML_FIXED.zip" -d extracted
+          echo "ZIP extracted successfully"
+          find extracted -maxdepth 4 -type f | head -100
 
       - name: Find Android project
         id: project
         shell: bash
         run: |
-          PROJECT_DIR=$(find extracted -type f -name "settings.gradle" -printf '%h\n' | head -n 1)
+          set -e
+
+          PROJECT_DIR="$(find extracted -type f -name settings.gradle -printf '%h\n' | head -1)"
 
           if [ -z "$PROJECT_DIR" ]; then
-            echo "Android project not found"
+            PROJECT_DIR="$(find extracted -type f -name settings.gradle.kts -printf '%h\n' | head -1)"
+          fi
+
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "Android project not found inside ZIP"
+            find extracted -maxdepth 5 -type f
             exit 1
           fi
 
-          echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
           echo "Android project found at: $PROJECT_DIR"
-
-      - name: Read Gradle version
-        id: gradle_version
-        working-directory: ${{ steps.project.outputs.dir }}
-        shell: bash
-        run: |
-          VERSION=$(grep "distributionUrl" gradle/wrapper/gradle-wrapper.properties | sed 's/.*gradle-\(.*\)-bin.zip/\1/' | tr -d '\r')
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Gradle version: $VERSION"
+          echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: ${{ steps.gradle_version.outputs.version }}
+          gradle-version: '8.7'
 
       - name: Build APK
+        shell: bash
         working-directory: ${{ steps.project.outputs.dir }}
-        run: gradle assembleDebug --stacktrace
-
-      - name: Find generated APK
         run: |
-          echo "Generated APK files:"
-          find "${{ steps.project.outputs.dir }}" -type f -name "*.apk" -print
+          set -e
+          gradle assembleDebug --stacktrace
+
+      - name: Locate APK
+        id: apk
+        shell: bash
+        run: |
+          set -e
+
+          APK="$(find "${{ steps.project.outputs.dir }}" -type f -name '*.apk' | head -1)"
+
+          if [ -z "$APK" ]; then
+            echo "APK was not generated"
+            exit 1
+          fi
+
+          echo "APK generated at: $APK"
+          mkdir -p apk-output
+          cp "$APK" "apk-output/Kayan-Vet-Hospital.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Kayan-Vet-Hospital-APK
-          path: ${{ steps.project.outputs.dir }}/app/build/outputs/apk/debug/*.apk
+          path: apk-output/Kayan-Vet-Hospital.apk
           if-no-files-found: error
+          retention-days: 30
