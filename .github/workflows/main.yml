@@ -1,4 +1,4 @@
-name: Build Kayan Vet Mobile APK
+name: Build Kayan Vet V2 APK
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
     branches:
       - main
     paths:
-      - 'KayanVetAndroid_MOBILE_HTML_FIXED.zip'
+      - 'KayanVetAndroid_V2_PLAY_READY.zip'
       - '.github/workflows/main.yml'
 
 jobs:
@@ -23,14 +23,14 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Extract mobile Android project
+      - name: Extract Kayan Vet V2
         shell: bash
         run: |
           set -e
           rm -rf extracted
-          mkdir extracted
-          unzip -q "KayanVetAndroid_MOBILE_HTML_FIXED.zip" -d extracted
-          echo "ZIP extracted successfully"
+          mkdir -p extracted
+          unzip -q "KayanVetAndroid_V2_PLAY_READY.zip" -d extracted
+          echo "Kayan Vet V2 extracted successfully"
           find extracted -maxdepth 4 -type f | head -100
 
       - name: Find Android project
@@ -46,12 +46,12 @@ jobs:
           fi
 
           if [ -z "$PROJECT_DIR" ]; then
-            echo "Android project not found inside ZIP"
+            echo "Android project not found"
             find extracted -maxdepth 5 -type f
             exit 1
           fi
 
-          echo "Android project found at: $PROJECT_DIR"
+          echo "Project found: $PROJECT_DIR"
           echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
 
       - name: Set up Gradle
@@ -59,34 +59,39 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Build APK
+      - name: Build Kayan Vet V2 APK
         shell: bash
         working-directory: ${{ steps.project.outputs.dir }}
         run: |
           set -e
           gradle assembleDebug --stacktrace
 
-      - name: Locate APK
-        id: apk
+      - name: Prepare APK
         shell: bash
         run: |
           set -e
 
-          APK="$(find "${{ steps.project.outputs.dir }}" -type f -name '*.apk' | head -1)"
+          APK="$(find "${{ steps.project.outputs.dir }}" -type f -name '*debug*.apk' | head -1)"
+
+          if [ -z "$APK" ]; then
+            APK="$(find "${{ steps.project.outputs.dir }}" -type f -name '*.apk' | head -1)"
+          fi
 
           if [ -z "$APK" ]; then
             echo "APK was not generated"
             exit 1
           fi
 
-          echo "APK generated at: $APK"
           mkdir -p apk-output
-          cp "$APK" "apk-output/Kayan-Vet-Hospital.apk"
+          cp "$APK" "apk-output/Kayan-Vet-Hospital-V2.apk"
 
-      - name: Upload APK
+          echo "APK READY:"
+          ls -lh apk-output/
+
+      - name: Upload Kayan Vet V2 APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kayan-Vet-Hospital-APK
-          path: apk-output/Kayan-Vet-Hospital.apk
+          name: Kayan-Vet-Hospital-V2-APK
+          path: apk-output/Kayan-Vet-Hospital-V2.apk
           if-no-files-found: error
           retention-days: 30
