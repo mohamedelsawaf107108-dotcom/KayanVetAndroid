@@ -1,4 +1,4 @@
-name: Build Kayan Vet Signed APK
+name: Build Kayan Vet V3.0.3 Signed APK
 
 on:
   workflow_dispatch:
@@ -25,76 +25,200 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      - name: Find and Extract Kayan Vet ZIP
+      - name: Find and Extract Kayan Vet V3.0.3
         shell: bash
         run: |
           set -e
 
-          ZIP_FILE=$(find . -maxdepth 2 -type f \
-            -name "KayanVetAndroid_V3.0.1_SIMPLE_FIXED_SIGNING*.zip" \
+          echo "Searching for Kayan Vet V3.0.3 ZIP..."
+
+          ZIP_FILE=$(find . -maxdepth 3 -type f \
+            -name "KayanVetAndroid_V3.0.3_ADMIN_EDIT_USER_VIEW_ONLY_FIXED_SIGNING*.zip" \
             | head -1)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: Kayan Vet V3.0.1 ZIP file was not found"
+            echo "ERROR: Kayan Vet V3.0.3 ZIP file was not found."
+            echo "Files currently in repository:"
+            find . -maxdepth 3 -type f
             exit 1
           fi
 
-          echo "Found ZIP: $ZIP_FILE"
+          echo "ZIP found:"
+          echo "$ZIP_FILE"
 
           rm -rf extracted_project
           mkdir -p extracted_project
 
+          echo "Extracting project..."
           unzip -q "$ZIP_FILE" -d extracted_project
+
+          echo "Searching for settings.gradle..."
 
           PROJECT_DIR=$(find extracted_project \
             -type f \
             \( -name "settings.gradle" -o -name "settings.gradle.kts" \) \
-            -printf '%h\n' | head -1)
+            -printf '%h\n' \
+            | head -1)
 
           if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: settings.gradle was not found after extraction"
+            echo "ERROR: Android project was not found after extraction."
+            find extracted_project -maxdepth 4 -type f
             exit 1
           fi
 
-          echo "Android project found at: $PROJECT_DIR"
+          echo "Android project found at:"
+          echo "$PROJECT_DIR"
+
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Check Required Project Files
+        shell: bash
+        run: |
+          set -e
+
+          echo "Checking Android project..."
+
+          test -f "$PROJECT_DIR/settings.gradle" || \
+          test -f "$PROJECT_DIR/settings.gradle.kts"
+
+          test -f "$PROJECT_DIR/app/build.gradle" || \
+          test -f "$PROJECT_DIR/app/build.gradle.kts"
+
+          test -f "$PROJECT_DIR/app/google-services.json"
+
+          test -f "$PROJECT_DIR/app/src/main/assets/index.html"
+
+          test -f "$PROJECT_DIR/app/kayan-vet-release.keystore"
+
+          echo "All required files found."
 
       - name: Enable AndroidX
         shell: bash
         run: |
-          echo "android.useAndroidX=true" >> "$PROJECT_DIR/gradle.properties"
-          echo "android.enableJetifier=true" >> "$PROJECT_DIR/gradle.properties"
+          set -e
+
+          touch "$PROJECT_DIR/gradle.properties"
+
+          if grep -q '^android.useAndroidX=' "$PROJECT_DIR/gradle.properties"; then
+            sed -i \
+              's/^android.useAndroidX=.*/android.useAndroidX=true/' \
+              "$PROJECT_DIR/gradle.properties"
+          else
+            echo "android.useAndroidX=true" \
+              >> "$PROJECT_DIR/gradle.properties"
+          fi
+
+          if grep -q '^android.enableJetifier=' "$PROJECT_DIR/gradle.properties"; then
+            sed -i \
+              's/^android.enableJetifier=.*/android.enableJetifier=true/' \
+              "$PROJECT_DIR/gradle.properties"
+          else
+            echo "android.enableJetifier=true" \
+              >> "$PROJECT_DIR/gradle.properties"
+          fi
+
+          echo "AndroidX enabled."
+
+      - name: Verify Kayan Vet Features
+        shell: bash
+        run: |
+          set -e
+
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo "Checking Firestore..."
+          grep -q "AndroidBridge.syncData" "$HTML"
+
+          echo "Checking safe cloud merge..."
+          grep -q "kayanSafeMergeDB" "$HTML"
+
+          echo "Checking Full Backup..."
+          grep -q "exportFullBackup" "$HTML"
+
+          echo "Checking Restore Backup..."
+          grep -q "restoreFullBackupFile" "$HTML"
+
+          echo "Checking medicine stock requests..."
+          grep -q "openStockModal('medicine','in')" "$HTML"
+          grep -q "openStockModal('medicine','out')" "$HTML"
+
+          echo "Checking feed stock requests..."
+          grep -q "openStockModal('feed','in')" "$HTML"
+          grep -q "openStockModal('feed','out')" "$HTML"
+
+          echo "Checking administrator permissions..."
+          grep -q "requireAdmin" "$HTML"
+
+          echo "Checking normal-user view-only mode..."
+          grep -q "readonly-user" "$HTML"
+
+          echo "All required Kayan Vet features found."
 
       - name: Build Signed Release APK
         shell: bash
         run: |
           set -e
+
+          echo "Starting Android release build..."
+
           cd "$PROJECT_DIR"
+
           gradle assembleRelease --stacktrace
 
-      - name: Find Signed APK
+          echo "Gradle build completed."
+
+      - name: Find Generated APK
         shell: bash
         run: |
           set -e
 
+          echo "Searching for release APK..."
+
           APK=$(find "$PROJECT_DIR/app/build/outputs/apk/release" \
-            -type f -name "*.apk" | head -1)
+            -type f \
+            -name "*.apk" \
+            | head -1)
 
           if [ -z "$APK" ]; then
-            echo "ERROR: Release APK was not generated"
+            echo "ERROR: Release APK was not generated."
+            find "$PROJECT_DIR/app/build/outputs" -type f || true
             exit 1
           fi
 
-          echo "APK found: $APK"
+          echo "APK found:"
+          echo "$APK"
+
+          echo "APK=$APK" >> "$GITHUB_ENV"
+
+      - name: Verify APK Signature
+        shell: bash
+        run: |
+          set -e
+
+          echo "Verifying APK signature..."
+
+          jarsigner -verify "$APK"
+
+          echo "APK signature verified."
+
+      - name: Prepare Final APK
+        shell: bash
+        run: |
+          set -e
 
           mkdir -p apk-output
+
           cp "$APK" \
-            "apk-output/Kayan-Vet-Hospital-V3.0.1-SIGNED.apk"
+            "apk-output/Kayan-Vet-Hospital-V3.0.3-SIGNED.apk"
+
+          echo "Final APK prepared."
+
+          ls -lh apk-output/
 
       - name: Upload Signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kayan-Vet-Hospital-V3.0.1-SIGNED
-          path: apk-output/Kayan-Vet-Hospital-V3.0.1-SIGNED.apk
+          name: Kayan-Vet-Hospital-V3.0.3-SIGNED
+          path: apk-output/Kayan-Vet-Hospital-V3.0.3-SIGNED.apk
           if-no-files-found: error
           retention-days: 30
