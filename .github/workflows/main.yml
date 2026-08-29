@@ -1,4 +1,4 @@
-name: Build Kayan Vet V2.6 PC Import Fixed Firebase APK
+name: Build Kayan Vet V2.8 Rest Status Daily Alert Firestore APK
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ on:
     branches:
       - main
     paths:
-      - 'KayanVetAndroid_V2.6_PC_IMPORT_FIXED_FIREBASE.zip'
+      - 'KayanVetAndroid_V2.8_REST_STATUS_DAILY_ALERT_FIRESTORE.zip'
       - '.github/workflows/main.yml'
 
 jobs:
@@ -32,7 +32,7 @@ jobs:
           rm -rf extracted
           mkdir -p extracted
 
-          unzip -q "KayanVetAndroid_V2.6_PC_IMPORT_FIXED_FIREBASE.zip" -d extracted
+          unzip -q "KayanVetAndroid_V2.8_REST_STATUS_DAILY_ALERT_FIRESTORE.zip" -d extracted
 
       - name: Find Android project
         id: project
@@ -47,7 +47,7 @@ jobs:
           fi
 
           if [ -z "$PROJECT_DIR" ]; then
-            echo "Android project not found"
+            echo "ERROR: Android project not found"
             exit 1
           fi
 
@@ -79,14 +79,16 @@ jobs:
         run: |
           set -e
 
-          if [ ! -f "${{ steps.project.outputs.dir }}/app/google-services.json" ]; then
+          FIREBASE_FILE="${{ steps.project.outputs.dir }}/app/google-services.json"
+
+          if [ ! -f "$FIREBASE_FILE" ]; then
             echo "ERROR: google-services.json not found"
             exit 1
           fi
 
           echo "Firebase configuration found successfully"
 
-      - name: Check PC backup file
+      - name: Check bundled PC backup
         shell: bash
         run: |
           set -e
@@ -98,7 +100,49 @@ jobs:
             exit 1
           fi
 
-          echo "PC backup data found successfully"
+          echo "PC backup found successfully"
+
+      - name: Check Firestore sync
+        shell: bash
+        run: |
+          set -e
+
+          INDEX_FILE="${{ steps.project.outputs.dir }}/app/src/main/assets/index.html"
+
+          if ! grep -q "syncCloud" "$INDEX_FILE"; then
+            echo "ERROR: Firestore sync function not found"
+            exit 1
+          fi
+
+          echo "Firestore automatic sync found successfully"
+
+      - name: Check rest status feature
+        shell: bash
+        run: |
+          set -e
+
+          INDEX_FILE="${{ steps.project.outputs.dir }}/app/src/main/assets/index.html"
+
+          if ! grep -q "workStatus" "$INDEX_FILE"; then
+            echo "ERROR: Horse work/rest status feature not found"
+            exit 1
+          fi
+
+          echo "Horse rest status feature found successfully"
+
+      - name: Check daily notification feature
+        shell: bash
+        run: |
+          set -e
+
+          WORKER="${{ steps.project.outputs.dir }}/app/src/main/java/com/kayan/vethospital/RestHorsesWorker.java"
+
+          if [ ! -f "$WORKER" ]; then
+            echo "ERROR: RestHorsesWorker.java not found"
+            exit 1
+          fi
+
+          echo "Daily rest horses notification feature found successfully"
 
       - name: Set up Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
@@ -141,12 +185,12 @@ jobs:
           mkdir -p apk-output
 
           cp "${{ steps.apk.outputs.path }}" \
-          "apk-output/Kayan-Vet-Hospital-V2.6-PC-Import-Fixed-Firebase.apk"
+          "apk-output/Kayan-Vet-Hospital-V2.8-Rest-Status-Daily-Alert-Firestore.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kayan-Vet-Hospital-V2.6-PC-Import-Fixed-Firebase-APK
-          path: apk-output/Kayan-Vet-Hospital-V2.6-PC-Import-Fixed-Firebase.apk
+          name: Kayan-Vet-Hospital-V2.8-Rest-Status-Daily-Alert-Firestore-APK
+          path: apk-output/Kayan-Vet-Hospital-V2.8-Rest-Status-Daily-Alert-Firestore.apk
           if-no-files-found: error
           retention-days: 30
