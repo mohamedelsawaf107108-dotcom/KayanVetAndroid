@@ -1,4 +1,4 @@
-name: Build Kayan Vet V2.9.1 Gradle Fixed Firestore APK
+name: Build Kayan Vet V2.9.3 Safe Recovery Firestore APK
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ on:
     branches:
       - main
     paths:
-      - 'KayanVetAndroid_V2.9.1_GRADLE_FIXED_FIRESTORE.zip'
+      - 'KayanVetAndroid_V2.9.3_SAFE_RECOVERY_MERGE_FIRESTORE.zip'
       - '.github/workflows/main.yml'
 
 jobs:
@@ -32,7 +32,7 @@ jobs:
           rm -rf extracted
           mkdir -p extracted
 
-          unzip -q "KayanVetAndroid_V2.9.1_GRADLE_FIXED_FIRESTORE.zip" -d extracted
+          unzip -q "KayanVetAndroid_V2.9.3_SAFE_RECOVERY_MERGE_FIRESTORE.zip" -d extracted
 
       - name: Find Android project
         id: project
@@ -126,6 +126,63 @@ jobs:
 
           echo "Firestore automatic sync found successfully"
 
+      - name: Check safe recovery merge
+        shell: bash
+        run: |
+          set -e
+
+          INDEX_FILE="${{ steps.project.outputs.dir }}/app/src/main/assets/index.html"
+
+          if ! grep -q "kayanSafeMergeDB" "$INDEX_FILE"; then
+            echo "ERROR: Safe recovery merge feature not found"
+            exit 1
+          fi
+
+          if ! grep -q "kayanMergeCollection" "$INDEX_FILE"; then
+            echo "ERROR: Safe collection merge feature not found"
+            exit 1
+          fi
+
+          echo "Safe recovery merge found successfully"
+
+      - name: Check medicine stock requests
+        shell: bash
+        run: |
+          set -e
+
+          INDEX_FILE="${{ steps.project.outputs.dir }}/app/src/main/assets/index.html"
+
+          if ! grep -q "openStockModal('medicine','in')" "$INDEX_FILE"; then
+            echo "ERROR: Medicine add request not found"
+            exit 1
+          fi
+
+          if ! grep -q "openStockModal('medicine','out')" "$INDEX_FILE"; then
+            echo "ERROR: Medicine dispense request not found"
+            exit 1
+          fi
+
+          echo "Medicine stock requests found successfully"
+
+      - name: Check feed stock requests
+        shell: bash
+        run: |
+          set -e
+
+          INDEX_FILE="${{ steps.project.outputs.dir }}/app/src/main/assets/index.html"
+
+          if ! grep -q "openStockModal('feed','in')" "$INDEX_FILE"; then
+            echo "ERROR: Feed add request not found"
+            exit 1
+          fi
+
+          if ! grep -q "openStockModal('feed','out')" "$INDEX_FILE"; then
+            echo "ERROR: Feed dispense request not found"
+            exit 1
+          fi
+
+          echo "Feed stock requests found successfully"
+
       - name: Check corrected feed calculation
         shell: bash
         run: |
@@ -180,7 +237,7 @@ jobs:
             exit 1
           fi
 
-          echo "Daily rest horses notification found successfully"
+          echo "Daily rest notification found successfully"
 
       - name: Check WorkManager dependency
         shell: bash
@@ -210,7 +267,21 @@ jobs:
 
           echo "Guava dependency found successfully"
 
-      - name: Show important Gradle dependencies
+      - name: Check ZXing QR dependency
+        shell: bash
+        run: |
+          set -e
+
+          GRADLE_FILE="${{ steps.project.outputs.dir }}/app/build.gradle"
+
+          if ! grep -q "com.google.zxing:core" "$GRADLE_FILE"; then
+            echo "ERROR: ZXing QR dependency not found"
+            exit 1
+          fi
+
+          echo "ZXing QR dependency found successfully"
+
+      - name: Show important dependencies
         shell: bash
         run: |
           set -e
@@ -265,14 +336,14 @@ jobs:
           mkdir -p apk-output
 
           cp "${{ steps.apk.outputs.path }}" \
-          "apk-output/Kayan-Vet-Hospital-V2.9.1-Firestore.apk"
+          "apk-output/Kayan-Vet-Hospital-V2.9.3-Safe-Recovery-Firestore.apk"
 
           echo "Final APK prepared successfully"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kayan-Vet-Hospital-V2.9.1-Firestore-APK
-          path: apk-output/Kayan-Vet-Hospital-V2.9.1-Firestore.apk
+          name: Kayan-Vet-Hospital-V2.9.3-Safe-Recovery-Firestore-APK
+          path: apk-output/Kayan-Vet-Hospital-V2.9.3-Safe-Recovery-Firestore.apk
           if-no-files-found: error
           retention-days: 30
