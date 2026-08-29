@@ -1,4 +1,4 @@
-name: Build Kayan Vet V2.8 Rest Status Daily Alert Firestore APK
+name: Build Kayan Vet V2.9 Feed Calc Fixed Firestore APK
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ on:
     branches:
       - main
     paths:
-      - 'KayanVetAndroid_V2.8_REST_STATUS_DAILY_ALERT_FIRESTORE.zip'
+      - 'KayanVetAndroid_V2.9_BUILD_FEED_CALC_FIXED_FIRESTORE.zip'
       - '.github/workflows/main.yml'
 
 jobs:
@@ -32,7 +32,7 @@ jobs:
           rm -rf extracted
           mkdir -p extracted
 
-          unzip -q "KayanVetAndroid_V2.8_REST_STATUS_DAILY_ALERT_FIRESTORE.zip" -d extracted
+          unzip -q "KayanVetAndroid_V2.9_BUILD_FEED_CALC_FIXED_FIRESTORE.zip" -d extracted
 
       - name: Find Android project
         id: project
@@ -102,7 +102,7 @@ jobs:
 
           echo "PC backup found successfully"
 
-      - name: Check Firestore sync
+      - name: Check Firestore automatic sync
         shell: bash
         run: |
           set -e
@@ -114,9 +114,14 @@ jobs:
             exit 1
           fi
 
+          if ! grep -q "AndroidBridge.syncData" "$INDEX_FILE"; then
+            echo "ERROR: Android Firestore bridge not found"
+            exit 1
+          fi
+
           echo "Firestore automatic sync found successfully"
 
-      - name: Check rest status feature
+      - name: Check horse work and rest status
         shell: bash
         run: |
           set -e
@@ -128,9 +133,9 @@ jobs:
             exit 1
           fi
 
-          echo "Horse rest status feature found successfully"
+          echo "Horse work/rest status feature found successfully"
 
-      - name: Check daily notification feature
+      - name: Check daily rest horses notification
         shell: bash
         run: |
           set -e
@@ -142,7 +147,49 @@ jobs:
             exit 1
           fi
 
-          echo "Daily rest horses notification feature found successfully"
+          echo "Daily rest horses notification found successfully"
+
+      - name: Check QR feature
+        shell: bash
+        run: |
+          set -e
+
+          INDEX_FILE="${{ steps.project.outputs.dir }}/app/src/main/assets/index.html"
+
+          if ! grep -q "openHorseQR" "$INDEX_FILE"; then
+            echo "ERROR: Horse QR feature not found"
+            exit 1
+          fi
+
+          echo "Horse QR feature found successfully"
+
+      - name: Check feed balance calculation
+        shell: bash
+        run: |
+          set -e
+
+          INDEX_FILE="${{ steps.project.outputs.dir }}/app/src/main/assets/index.html"
+
+          if ! grep -q "v2FeedStockKg" "$INDEX_FILE"; then
+            echo "ERROR: Corrected feed stock calculation not found"
+            exit 1
+          fi
+
+          echo "Corrected feed stock calculation found successfully"
+
+      - name: Check notification build dependency
+        shell: bash
+        run: |
+          set -e
+
+          GRADLE_FILE="${{ steps.project.outputs.dir }}/app/build.gradle"
+
+          if ! grep -q "com.google.guava:guava" "$GRADLE_FILE"; then
+            echo "ERROR: Guava dependency not found"
+            exit 1
+          fi
+
+          echo "Notification build dependency found successfully"
 
       - name: Set up Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
@@ -185,12 +232,12 @@ jobs:
           mkdir -p apk-output
 
           cp "${{ steps.apk.outputs.path }}" \
-          "apk-output/Kayan-Vet-Hospital-V2.8-Rest-Status-Daily-Alert-Firestore.apk"
+          "apk-output/Kayan-Vet-Hospital-V2.9-Firestore.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kayan-Vet-Hospital-V2.8-Rest-Status-Daily-Alert-Firestore-APK
-          path: apk-output/Kayan-Vet-Hospital-V2.8-Rest-Status-Daily-Alert-Firestore.apk
+          name: Kayan-Vet-Hospital-V2.9-Firestore-APK
+          path: apk-output/Kayan-Vet-Hospital-V2.9-Firestore.apk
           if-no-files-found: error
           retention-days: 30
