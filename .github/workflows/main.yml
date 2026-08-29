@@ -1,4 +1,4 @@
-name: Build Kayan Vet V3.1.0 Signed APK
+name: Build Kayan Vet V3.1.1 Signed APK
 
 on:
   workflow_dispatch:
@@ -25,20 +25,20 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      - name: Find and Extract Kayan Vet V3.1.0
+      - name: Find and Extract Kayan Vet V3.1.1
         shell: bash
         run: |
           set -e
 
-          echo "Searching for Kayan Vet V3.1.0 ZIP..."
+          echo "Searching for Kayan Vet V3.1.1 ZIP..."
 
           ZIP_FILE=$(find . -maxdepth 3 -type f \
-            -name "KayanVetAndroid_V3.1.0_DATE_REVENUE_QR_HORSE_REPORT_PDF_FIXED_SIGNING*.zip" \
+            -name "KayanVetAndroid_V3.1.1_REVENUE_VISIBLE_ADMIN_FIXED_SIGNING*.zip" \
             | head -1)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: Kayan Vet V3.1.0 ZIP file was not found."
-            echo "Files in repository:"
+            echo "ERROR: Kayan Vet V3.1.1 ZIP file was not found."
+            echo "Files currently in repository:"
             find . -maxdepth 3 -type f
             exit 1
           fi
@@ -59,7 +59,7 @@ jobs:
             | head -1)
 
           if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: Android project not found after extraction."
+            echo "ERROR: Android project was not found after extraction."
             find extracted_project -maxdepth 4 -type f
             exit 1
           fi
@@ -74,7 +74,7 @@ jobs:
         run: |
           set -e
 
-          echo "Checking project files..."
+          echo "Checking required Android files..."
 
           test -f "$PROJECT_DIR/settings.gradle" || \
           test -f "$PROJECT_DIR/settings.gradle.kts"
@@ -88,7 +88,7 @@ jobs:
 
           test -f "$PROJECT_DIR/app/kayan-vet-release.keystore"
 
-          echo "All required project files found."
+          echo "All required files found."
 
       - name: Enable AndroidX
         shell: bash
@@ -117,7 +117,7 @@ jobs:
 
           echo "AndroidX enabled."
 
-      - name: Verify Kayan Vet Core Features
+      - name: Verify Core Features
         shell: bash
         run: |
           set -e
@@ -130,15 +130,17 @@ jobs:
           echo "Checking safe merge..."
           grep -q "kayanSafeMergeDB" "$HTML"
 
-          echo "Checking Full Backup..."
+          echo "Checking full backup..."
           grep -q "exportFullBackup" "$HTML"
 
-          echo "Checking Restore Backup..."
+          echo "Checking backup restore..."
           grep -q "restoreFullBackupFile" "$HTML"
 
-          echo "Checking user permissions..."
-          grep -q "readonly-user" "$HTML"
+          echo "Checking administrator permissions..."
           grep -q "requireAdmin" "$HTML"
+
+          echo "Checking normal-user view-only mode..."
+          grep -q "readonly-user" "$HTML"
 
           echo "Checking medicine stock requests..."
           grep -q "openStockModal('medicine','in')" "$HTML"
@@ -150,71 +152,143 @@ jobs:
 
           echo "Core features verified."
 
-      - name: Verify V3.1.0 New Features
+      - name: Verify Easy Date Entry
         shell: bash
         run: |
           set -e
 
           HTML="$PROJECT_DIR/app/src/main/assets/index.html"
 
-          echo "Checking easy date entry..."
-          grep -q "29082026" "$HTML"
+          echo "Checking date input..."
           grep -q "kayanDateTyping" "$HTML"
+          grep -q "29082026" "$HTML"
 
-          echo "Checking hospital revenues..."
+          echo "Easy date entry verified."
+
+      - name: Verify Hospital Revenue Section
+        shell: bash
+        run: |
+          set -e
+
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo "Checking revenue page..."
           grep -q 'id="revenues"' "$HTML"
-          grep -q "renderRevenues" "$HTML"
+
+          echo "Checking revenue menu button..."
+          grep -q 'data-view="revenues"' "$HTML"
+
+          echo "Checking visible revenue dashboard shortcut..."
+          grep -q "revenue-dashboard-shortcut" "$HTML"
+
+          echo "Checking revenue functions..."
           grep -q "openRevenueModal" "$HTML"
+          grep -q "saveRevenue" "$HTML"
+          grep -q "renderRevenues" "$HTML"
 
-          echo "Checking horse QR..."
+          echo "Checking live totals..."
+          grep -q "revenueTotal" "$HTML"
+          grep -q "revenueMonth" "$HTML"
+
+          echo "Hospital revenue section verified."
+
+      - name: Verify Horse QR
+        shell: bash
+        run: |
+          set -e
+
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+
           grep -q "openHorseQR" "$HTML"
+          grep -q "generateQr" "$HTML"
 
-          echo "Checking comprehensive horse report..."
+          echo "Horse QR verified."
+
+      - name: Verify Horse Comprehensive Report
+        shell: bash
+        run: |
+          set -e
+
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+
           grep -q "openHorseReport" "$HTML"
-          grep -q "سجل تغييرات العلف" "$HTML"
+          grep -q "printHorseReport" "$HTML"
+
+          echo "Checking medical history..."
+          grep -q "الحالات المرضية" "$HTML"
+
+          echo "Checking medication history..."
+          grep -q "الأدوية المصروفة للحصان" "$HTML"
+
+          echo "Checking current feeding schedule..."
+          grep -q "برنامج التغذية الحالي" "$HTML"
 
           echo "Checking feeding change history..."
+          grep -q "سجل تغييرات العلف" "$HTML"
           grep -q "recordFeedingChange" "$HTML"
 
-          echo "Checking PDF / Print..."
-          grep -q "printHorseReport" "$HTML"
+          echo "Horse comprehensive report verified."
+
+      - name: Verify PDF and Print
+        shell: bash
+        run: |
+          set -e
+
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+          MAIN="$PROJECT_DIR/app/src/main/java/com/kayan/vethospital/MainActivity.java"
+
+          echo "Checking report print functions..."
           grep -q "printReportElement" "$HTML"
+          grep -q "printReportHtml" "$HTML"
+
+          echo "Checking Android printing..."
+          grep -q "printCurrentPage" "$MAIN"
+          grep -q "PrintManager" "$MAIN"
 
           echo "Checking report signature..."
           grep -q "الرائد / محمد الصواف" "$HTML"
           grep -q "رئيس القسم البيطري" "$HTML"
 
-          echo "All V3.1.0 features verified."
+          echo "PDF / print support verified."
 
-      - name: Verify Firestore Revenue Collection
+      - name: Verify Firestore Collections
         shell: bash
         run: |
           set -e
 
           MAIN="$PROJECT_DIR/app/src/main/java/com/kayan/vethospital/MainActivity.java"
 
+          echo "Checking Firestore collections..."
+
+          grep -q '"medicines"' "$MAIN"
+          grep -q '"feed"' "$MAIN"
+          grep -q '"horses"' "$MAIN"
+          grep -q '"cases"' "$MAIN"
+          grep -q '"moves"' "$MAIN"
           grep -q '"revenues"' "$MAIN"
 
-          echo "Revenue Firestore collection verified."
+          echo "Firestore collections verified."
 
-      - name: Verify Android Printing
+      - name: Verify Fixed Signing Key
         shell: bash
         run: |
           set -e
 
-          MAIN="$PROJECT_DIR/app/src/main/java/com/kayan/vethospital/MainActivity.java"
+          echo "Checking fixed signing key..."
 
-          grep -q "printCurrentPage" "$MAIN"
-          grep -q "PrintManager" "$MAIN"
+          test -f "$PROJECT_DIR/app/kayan-vet-release.keystore"
 
-          echo "Android PDF/print support verified."
+          grep -q "signingConfigs" "$PROJECT_DIR/app/build.gradle"
+          grep -q "release" "$PROJECT_DIR/app/build.gradle"
+
+          echo "Fixed signing configuration found."
 
       - name: Build Signed Release APK
         shell: bash
         run: |
           set -e
 
-          echo "Starting signed release build..."
+          echo "Starting Android release build..."
 
           cd "$PROJECT_DIR"
 
@@ -222,12 +296,12 @@ jobs:
 
           echo "Gradle build completed."
 
-      - name: Find Generated APK
+      - name: Find Generated Release APK
         shell: bash
         run: |
           set -e
 
-          echo "Searching for generated release APK..."
+          echo "Searching for release APK..."
 
           APK=$(find "$PROJECT_DIR/app/build/outputs/apk/release" \
             -type f \
@@ -254,7 +328,7 @@ jobs:
 
           jarsigner -verify "$APK"
 
-          echo "APK signature verified successfully."
+          echo "APK signature verified."
 
       - name: Prepare Final APK
         shell: bash
@@ -264,7 +338,7 @@ jobs:
           mkdir -p apk-output
 
           cp "$APK" \
-            "apk-output/Kayan-Vet-Hospital-V3.1.0-SIGNED.apk"
+            "apk-output/Kayan-Vet-Hospital-V3.1.1-SIGNED.apk"
 
           echo "Final APK prepared:"
           ls -lh apk-output/
@@ -272,7 +346,7 @@ jobs:
       - name: Upload Signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kayan-Vet-Hospital-V3.1.0-SIGNED
-          path: apk-output/Kayan-Vet-Hospital-V3.1.0-SIGNED.apk
+          name: Kayan-Vet-Hospital-V3.1.1-SIGNED
+          path: apk-output/Kayan-Vet-Hospital-V3.1.1-SIGNED.apk
           if-no-files-found: error
           retention-days: 30
