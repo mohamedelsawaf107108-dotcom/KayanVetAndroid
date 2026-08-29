@@ -1,4 +1,4 @@
-name: Build Kayan Vet V2.5 With PC Data Firebase APK
+name: Build Kayan Vet V2.6 PC Import Fixed Firebase APK
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ on:
     branches:
       - main
     paths:
-      - 'KayanVetAndroid_V2.5_WITH_PC_DATA_FIREBASE.zip'
+      - 'KayanVetAndroid_V2.6_PC_IMPORT_FIXED_FIREBASE.zip'
       - '.github/workflows/main.yml'
 
 jobs:
@@ -32,7 +32,7 @@ jobs:
           rm -rf extracted
           mkdir -p extracted
 
-          unzip -q "KayanVetAndroid_V2.5_WITH_PC_DATA_FIREBASE.zip" -d extracted
+          unzip -q "KayanVetAndroid_V2.6_PC_IMPORT_FIXED_FIREBASE.zip" -d extracted
 
       - name: Find Android project
         id: project
@@ -86,7 +86,7 @@ jobs:
 
           echo "Firebase configuration found successfully"
 
-      - name: Check bundled PC backup
+      - name: Check PC backup file
         shell: bash
         run: |
           set -e
@@ -141,12 +141,12 @@ jobs:
           mkdir -p apk-output
 
           cp "${{ steps.apk.outputs.path }}" \
-          "apk-output/Kayan-Vet-Hospital-V2.5-PC-Data-Firebase.apk"
+          "apk-output/Kayan-Vet-Hospital-V2.6-PC-Import-Fixed-Firebase.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kayan-Vet-Hospital-V2.5-PC-Data-Firebase-APK
-          path: apk-output/Kayan-Vet-Hospital-V2.5-PC-Data-Firebase.apk
+          name: Kayan-Vet-Hospital-V2.6-PC-Import-Fixed-Firebase-APK
+          path: apk-output/Kayan-Vet-Hospital-V2.6-PC-Import-Fixed-Firebase.apk
           if-no-files-found: error
           retention-days: 30
