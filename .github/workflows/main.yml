@@ -1,4 +1,4 @@
-name: Build Kayan Vet Firebase Final APK
+name: Build Kayan Vet V2.4 All Fixes Firebase APK
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ on:
     branches:
       - main
     paths:
-      - 'KayanVetAndroid_V2_FIREBASE_FINAL.zip'
+      - 'KayanVetAndroid_V2.4_ALL_FIXES_FIREBASE.zip'
       - '.github/workflows/main.yml'
 
 jobs:
@@ -32,7 +32,7 @@ jobs:
           rm -rf extracted
           mkdir -p extracted
 
-          unzip -q "KayanVetAndroid_V2_FIREBASE_FINAL.zip" -d extracted
+          unzip -q "KayanVetAndroid_V2.4_ALL_FIXES_FIREBASE.zip" -d extracted
 
       - name: Find Android project
         id: project
@@ -96,6 +96,7 @@ jobs:
         working-directory: ${{ steps.project.outputs.dir }}
         run: |
           set -e
+
           gradle assembleDebug --stacktrace
 
       - name: Find generated APK
@@ -126,12 +127,12 @@ jobs:
           mkdir -p apk-output
 
           cp "${{ steps.apk.outputs.path }}" \
-          "apk-output/Kayan-Vet-Hospital-Firebase-V2.2.apk"
+          "apk-output/Kayan-Vet-Hospital-V2.4-All-Fixes-Firebase.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kayan-Vet-Hospital-Firebase-V2.2-APK
-          path: apk-output/Kayan-Vet-Hospital-Firebase-V2.2.apk
+          name: Kayan-Vet-Hospital-V2.4-All-Fixes-Firebase-APK
+          path: apk-output/Kayan-Vet-Hospital-V2.4-All-Fixes-Firebase.apk
           if-no-files-found: error
           retention-days: 30
