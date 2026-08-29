@@ -1,4 +1,4 @@
-name: Build Kayan Vet V2.4 All Fixes Firebase APK
+name: Build Kayan Vet V2.5 With PC Data Firebase APK
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ on:
     branches:
       - main
     paths:
-      - 'KayanVetAndroid_V2.4_ALL_FIXES_FIREBASE.zip'
+      - 'KayanVetAndroid_V2.5_WITH_PC_DATA_FIREBASE.zip'
       - '.github/workflows/main.yml'
 
 jobs:
@@ -32,7 +32,7 @@ jobs:
           rm -rf extracted
           mkdir -p extracted
 
-          unzip -q "KayanVetAndroid_V2.4_ALL_FIXES_FIREBASE.zip" -d extracted
+          unzip -q "KayanVetAndroid_V2.5_WITH_PC_DATA_FIREBASE.zip" -d extracted
 
       - name: Find Android project
         id: project
@@ -80,11 +80,25 @@ jobs:
           set -e
 
           if [ ! -f "${{ steps.project.outputs.dir }}/app/google-services.json" ]; then
-            echo "google-services.json not found"
+            echo "ERROR: google-services.json not found"
             exit 1
           fi
 
-          echo "Firebase configuration found"
+          echo "Firebase configuration found successfully"
+
+      - name: Check bundled PC backup
+        shell: bash
+        run: |
+          set -e
+
+          BACKUP="${{ steps.project.outputs.dir }}/app/src/main/assets/computer_backup.json"
+
+          if [ ! -f "$BACKUP" ]; then
+            echo "ERROR: computer_backup.json not found"
+            exit 1
+          fi
+
+          echo "PC backup data found successfully"
 
       - name: Set up Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
@@ -112,14 +126,14 @@ jobs:
           fi
 
           if [ -z "$APK" ]; then
-            echo "APK was not generated"
+            echo "ERROR: APK was not generated"
             exit 1
           fi
 
           echo "APK found at: $APK"
           echo "path=$APK" >> "$GITHUB_OUTPUT"
 
-      - name: Prepare APK
+      - name: Prepare final APK
         shell: bash
         run: |
           set -e
@@ -127,12 +141,12 @@ jobs:
           mkdir -p apk-output
 
           cp "${{ steps.apk.outputs.path }}" \
-          "apk-output/Kayan-Vet-Hospital-V2.4-All-Fixes-Firebase.apk"
+          "apk-output/Kayan-Vet-Hospital-V2.5-PC-Data-Firebase.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kayan-Vet-Hospital-V2.4-All-Fixes-Firebase-APK
-          path: apk-output/Kayan-Vet-Hospital-V2.4-All-Fixes-Firebase.apk
+          name: Kayan-Vet-Hospital-V2.5-PC-Data-Firebase-APK
+          path: apk-output/Kayan-Vet-Hospital-V2.5-PC-Data-Firebase.apk
           if-no-files-found: error
           retention-days: 30
