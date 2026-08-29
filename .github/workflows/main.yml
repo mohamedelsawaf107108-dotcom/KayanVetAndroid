@@ -1,4 +1,4 @@
-name: Build Kayan Vet V2.9 Feed Calc Fixed Firestore APK
+name: Build Kayan Vet V2.9.1 Gradle Fixed Firestore APK
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ on:
     branches:
       - main
     paths:
-      - 'KayanVetAndroid_V2.9_BUILD_FEED_CALC_FIXED_FIRESTORE.zip'
+      - 'KayanVetAndroid_V2.9.1_GRADLE_FIXED_FIRESTORE.zip'
       - '.github/workflows/main.yml'
 
 jobs:
@@ -32,7 +32,7 @@ jobs:
           rm -rf extracted
           mkdir -p extracted
 
-          unzip -q "KayanVetAndroid_V2.9_BUILD_FEED_CALC_FIXED_FIRESTORE.zip" -d extracted
+          unzip -q "KayanVetAndroid_V2.9.1_GRADLE_FIXED_FIRESTORE.zip" -d extracted
 
       - name: Find Android project
         id: project
@@ -109,6 +109,11 @@ jobs:
 
           INDEX_FILE="${{ steps.project.outputs.dir }}/app/src/main/assets/index.html"
 
+          if [ ! -f "$INDEX_FILE" ]; then
+            echo "ERROR: index.html not found"
+            exit 1
+          fi
+
           if ! grep -q "syncCloud" "$INDEX_FILE"; then
             echo "ERROR: Firestore sync function not found"
             exit 1
@@ -121,6 +126,20 @@ jobs:
 
           echo "Firestore automatic sync found successfully"
 
+      - name: Check corrected feed calculation
+        shell: bash
+        run: |
+          set -e
+
+          INDEX_FILE="${{ steps.project.outputs.dir }}/app/src/main/assets/index.html"
+
+          if ! grep -q "v2FeedStockKg" "$INDEX_FILE"; then
+            echo "ERROR: Corrected feed calculation not found"
+            exit 1
+          fi
+
+          echo "Corrected feed calculation found successfully"
+
       - name: Check horse work and rest status
         shell: bash
         run: |
@@ -129,11 +148,25 @@ jobs:
           INDEX_FILE="${{ steps.project.outputs.dir }}/app/src/main/assets/index.html"
 
           if ! grep -q "workStatus" "$INDEX_FILE"; then
-            echo "ERROR: Horse work/rest status feature not found"
+            echo "ERROR: Horse work/rest status not found"
             exit 1
           fi
 
-          echo "Horse work/rest status feature found successfully"
+          echo "Horse work/rest status found successfully"
+
+      - name: Check horse QR feature
+        shell: bash
+        run: |
+          set -e
+
+          INDEX_FILE="${{ steps.project.outputs.dir }}/app/src/main/assets/index.html"
+
+          if ! grep -q "openHorseQR" "$INDEX_FILE"; then
+            echo "ERROR: Horse QR feature not found"
+            exit 1
+          fi
+
+          echo "Horse QR feature found successfully"
 
       - name: Check daily rest horses notification
         shell: bash
@@ -149,35 +182,21 @@ jobs:
 
           echo "Daily rest horses notification found successfully"
 
-      - name: Check QR feature
+      - name: Check WorkManager dependency
         shell: bash
         run: |
           set -e
 
-          INDEX_FILE="${{ steps.project.outputs.dir }}/app/src/main/assets/index.html"
+          GRADLE_FILE="${{ steps.project.outputs.dir }}/app/build.gradle"
 
-          if ! grep -q "openHorseQR" "$INDEX_FILE"; then
-            echo "ERROR: Horse QR feature not found"
+          if ! grep -q "androidx.work:work-runtime" "$GRADLE_FILE"; then
+            echo "ERROR: WorkManager dependency not found"
             exit 1
           fi
 
-          echo "Horse QR feature found successfully"
+          echo "WorkManager dependency found successfully"
 
-      - name: Check feed balance calculation
-        shell: bash
-        run: |
-          set -e
-
-          INDEX_FILE="${{ steps.project.outputs.dir }}/app/src/main/assets/index.html"
-
-          if ! grep -q "v2FeedStockKg" "$INDEX_FILE"; then
-            echo "ERROR: Corrected feed stock calculation not found"
-            exit 1
-          fi
-
-          echo "Corrected feed stock calculation found successfully"
-
-      - name: Check notification build dependency
+      - name: Check Guava dependency
         shell: bash
         run: |
           set -e
@@ -189,7 +208,21 @@ jobs:
             exit 1
           fi
 
-          echo "Notification build dependency found successfully"
+          echo "Guava dependency found successfully"
+
+      - name: Show important Gradle dependencies
+        shell: bash
+        run: |
+          set -e
+
+          GRADLE_FILE="${{ steps.project.outputs.dir }}/app/build.gradle"
+
+          echo "----- IMPORTANT DEPENDENCIES -----"
+
+          grep "firebase" "$GRADLE_FILE" || true
+          grep "work-runtime" "$GRADLE_FILE" || true
+          grep "guava" "$GRADLE_FILE" || true
+          grep "zxing" "$GRADLE_FILE" || true
 
       - name: Set up Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
@@ -232,12 +265,14 @@ jobs:
           mkdir -p apk-output
 
           cp "${{ steps.apk.outputs.path }}" \
-          "apk-output/Kayan-Vet-Hospital-V2.9-Firestore.apk"
+          "apk-output/Kayan-Vet-Hospital-V2.9.1-Firestore.apk"
+
+          echo "Final APK prepared successfully"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kayan-Vet-Hospital-V2.9-Firestore-APK
-          path: apk-output/Kayan-Vet-Hospital-V2.9-Firestore.apk
+          name: Kayan-Vet-Hospital-V2.9.1-Firestore-APK
+          path: apk-output/Kayan-Vet-Hospital-V2.9.1-Firestore.apk
           if-no-files-found: error
           retention-days: 30
