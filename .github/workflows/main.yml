@@ -1,4 +1,4 @@
-name: Build Kayan Vet V3.2.4 Signed APK
+name: Build Kayan Vet V3.2.5 Signed APK
 
 on:
   workflow_dispatch:
@@ -13,14 +13,14 @@ jobs:
     steps:
 
       # ============================================================
-      # 1) Checkout
+      # 1) Checkout Repository
       # ============================================================
       - name: Checkout Repository
         uses: actions/checkout@v4
 
 
       # ============================================================
-      # 2) Java 17
+      # 2) Setup Java 17
       # ============================================================
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -30,7 +30,7 @@ jobs:
 
 
       # ============================================================
-      # 3) Gradle 8.11.1
+      # 3) Setup Gradle 8.11.1
       # ============================================================
       - name: Setup Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
@@ -39,25 +39,25 @@ jobs:
 
 
       # ============================================================
-      # 4) البحث عن ZIP النسخة الحالية وفك الضغط
+      # 4) Find and Extract V3.2.5 ZIP
       # ============================================================
-      - name: Find and Extract Kayan Vet V3.2.4
+      - name: Find and Extract Kayan Vet V3.2.5
         shell: bash
         run: |
           set -e
 
           echo "============================================"
-          echo "Searching for Kayan Vet V3.2.4 ZIP..."
+          echo "Searching for Kayan Vet V3.2.5 ZIP..."
           echo "============================================"
 
           ZIP_FILE=$(find . -maxdepth 5 -type f \
-            -name "KayanVetAndroid_V3.2.4_DASHBOARD_BUNDLED_BACKUP_RUNTIME_FIXED_LIVE_SYNC_FIXED_SIGNING*.zip" \
+            -name "KayanVetAndroid_V3.2.5_MONTHLY_REPORT_RUNTIME_FIXED_FULL_FEATURES_LIVE_SYNC_FIXED_SIGNING*.zip" \
             | head -1)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: V3.2.4 ZIP file was not found."
+            echo "ERROR: V3.2.5 ZIP file was not found."
             echo ""
-            echo "Files currently available:"
+            echo "Repository files:"
             find . -maxdepth 5 -type f
             exit 1
           fi
@@ -90,14 +90,14 @@ jobs:
 
 
       # ============================================================
-      # 5) الملفات الأساسية
+      # 5) Verify Required Files
       # ============================================================
       - name: Verify Required Project Files
         shell: bash
         run: |
           set -e
 
-          echo "Checking required files..."
+          echo "Checking project files..."
 
           if [ ! -f "$PROJECT_DIR/settings.gradle" ] && \
              [ ! -f "$PROJECT_DIR/settings.gradle.kts" ]; then
@@ -116,7 +116,7 @@ jobs:
           test -f "$PROJECT_DIR/app/google-services.json"
           test -f "$PROJECT_DIR/app/kayan-vet-release.keystore"
 
-          echo "All required project files are present."
+          echo "All required files are present."
 
 
       # ============================================================
@@ -146,31 +146,32 @@ jobs:
           fi
 
           echo ""
+          echo "gradle.properties:"
           cat "$PROJECT_DIR/gradle.properties"
 
 
       # ============================================================
-      # 7) Version
+      # 7) Verify Version
       # ============================================================
-      - name: Verify Version V3.2.4
+      - name: Verify Version V3.2.5
         shell: bash
         run: |
           set -e
 
           GRADLE="$PROJECT_DIR/app/build.gradle"
 
-          echo "Checking version..."
+          echo "Checking application version..."
 
-          grep -Fq "versionCode 25" "$GRADLE"
-          grep -Fq "versionName '3.2.4'" "$GRADLE"
+          grep -Fq "versionCode 26" "$GRADLE"
+          grep -Fq "versionName '3.2.5'" "$GRADLE"
 
-          echo "Version V3.2.4 verified."
+          echo "Version V3.2.5 verified."
 
 
       # ============================================================
-      # 8) Android SDK
+      # 8) Verify Android SDK
       # ============================================================
-      - name: Verify Android SDK
+      - name: Verify Android SDK Configuration
         shell: bash
         run: |
           set -e
@@ -180,11 +181,26 @@ jobs:
           grep -Fq "compileSdk 36" "$GRADLE"
           grep -Fq "targetSdk 36" "$GRADLE"
 
-          echo "Android SDK verified."
+          echo "Android SDK configuration verified."
 
 
       # ============================================================
-      # 9) Firebase
+      # 9) Verify Internet Permission
+      # ============================================================
+      - name: Verify Internet Permission
+        shell: bash
+        run: |
+          set -e
+
+          MANIFEST="$PROJECT_DIR/app/src/main/AndroidManifest.xml"
+
+          grep -Fq "android.permission.INTERNET" "$MANIFEST"
+
+          echo "Internet permission verified."
+
+
+      # ============================================================
+      # 10) Verify Firebase
       # ============================================================
       - name: Verify Firebase Configuration
         shell: bash
@@ -204,26 +220,11 @@ jobs:
           grep -Fq '"moves"' "$MAIN"
           grep -Fq '"revenues"' "$MAIN"
 
-          echo "Firebase verified."
+          echo "Firebase configuration verified."
 
 
       # ============================================================
-      # 10) Internet Permission
-      # ============================================================
-      - name: Verify Internet Permission
-        shell: bash
-        run: |
-          set -e
-
-          MANIFEST="$PROJECT_DIR/app/src/main/AndroidManifest.xml"
-
-          grep -Fq "android.permission.INTERNET" "$MANIFEST"
-
-          echo "Internet permission verified."
-
-
-      # ============================================================
-      # 11) Live Sync
+      # 11) Verify Live Sync
       # ============================================================
       - name: Verify Live Firestore Sync
         shell: bash
@@ -243,20 +244,20 @@ jobs:
 
           grep -Fq "KayanRealtimeConnected" "$HTML"
 
-          echo "Live Sync verified."
+          echo "Live Firestore Sync verified."
 
 
       # ============================================================
-      # 12) Dashboard
+      # 12) Verify Dashboard
       # ============================================================
-      - name: Verify Dashboard Runtime Fix
+      - name: Verify Dashboard Runtime
         shell: bash
         run: |
           set -e
 
           HTML="$PROJECT_DIR/app/src/main/assets/index.html"
 
-          echo "Checking dashboard..."
+          echo "Checking Dashboard..."
 
           grep -Fq "function renderDashboard()" "$HTML"
           grep -Fq "function renderAll(){renderDashboard();" "$HTML"
@@ -266,11 +267,94 @@ jobs:
           grep -Fq "dashVacantBoxes" "$HTML"
           grep -Fq "recentMoves" "$HTML"
 
-          echo "Dashboard runtime fix verified."
+          echo "Dashboard verified."
 
 
       # ============================================================
-      # 13) Bundled Backup Runtime Fix
+      # 13) Verify Monthly Report Helper Functions
+      # ============================================================
+      - name: Verify Monthly Report Runtime Fix
+        shell: bash
+        run: |
+          set -e
+
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo "Checking monthly report helper functions..."
+
+          grep -Fq "function monthKey(" "$HTML"
+          grep -Fq "function inMonth(" "$HTML"
+          grep -Fq "function inferStable(" "$HTML"
+          grep -Fq "function aggregateItems(" "$HTML"
+          grep -Fq "function detailHTML(" "$HTML"
+          grep -Fq "function monthlyDataForKey(" "$HTML"
+
+          grep -Fq "function getMonthlyReportData()" "$HTML"
+          grep -Fq "function renderReports()" "$HTML"
+
+          echo "Monthly report runtime fix verified."
+
+
+      # ============================================================
+      # 14) Verify Annual Report
+      # ============================================================
+      - name: Verify Annual Report
+        shell: bash
+        run: |
+          set -e
+
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo "Checking annual report..."
+
+          grep -Fq "function getAnnualReportData(year)" "$HTML"
+          grep -Fq "function renderAnnualReport()" "$HTML"
+
+          echo "Annual report verified."
+
+
+      # ============================================================
+      # 15) Verify Reports Have No Charts
+      # ============================================================
+      - name: Verify Reports Have No Charts
+        shell: bash
+        run: |
+          set -e
+
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo "Checking reports contain no charts..."
+
+          if grep -Fq "simpleBarChartHTML(" "$HTML"; then
+            echo "ERROR: Chart function still exists."
+            exit 1
+          fi
+
+          if grep -Fq "renderMonthlyCharts(" "$HTML"; then
+            echo "ERROR: Monthly chart function still exists."
+            exit 1
+          fi
+
+          if grep -Fq "printableChartsHTML(" "$HTML"; then
+            echo "ERROR: Printable chart function still exists."
+            exit 1
+          fi
+
+          if grep -Fq 'id="monthlyCharts"' "$HTML"; then
+            echo "ERROR: Monthly chart container still exists."
+            exit 1
+          fi
+
+          if grep -Fq 'id="annualCharts"' "$HTML"; then
+            echo "ERROR: Annual chart container still exists."
+            exit 1
+          fi
+
+          echo "Reports are tables/data only."
+
+
+      # ============================================================
+      # 16) Verify Bundled Computer Backup
       # ============================================================
       - name: Verify Bundled Backup Runtime Fix
         shell: bash
@@ -279,7 +363,7 @@ jobs:
 
           HTML="$PROJECT_DIR/app/src/main/assets/index.html"
 
-          echo "Checking bundled backup handling..."
+          echo "Checking bundled computer backup..."
 
           grep -Fq "function KayanBundledBackupLoaded(jsonText)" "$HTML"
           grep -Fq "kayanSafeMergeDB(incoming,db)" "$HTML"
@@ -289,28 +373,11 @@ jobs:
             "تعذر دمج نسخة الكمبيوتر، لكن البيانات الحالية لم يتم حذفها." \
             "$HTML"
 
-          echo "Bundled backup runtime fix verified."
+          echo "Bundled backup runtime verified."
 
 
       # ============================================================
-      # 14) Full Backup
-      # ============================================================
-      - name: Verify Full Backup
-        shell: bash
-        run: |
-          set -e
-
-          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
-          MAIN="$PROJECT_DIR/app/src/main/java/com/kayan/vethospital/MainActivity.java"
-
-          grep -Fq "exportFullBackup" "$HTML"
-          grep -Fq "exportBackup" "$MAIN"
-
-          echo "Full Backup verified."
-
-
-      # ============================================================
-      # 15) Safe Restore
+      # 17) Verify Safe Restore
       # ============================================================
       - name: Verify Safe Backup Restore
         shell: bash
@@ -329,7 +396,7 @@ jobs:
             "$HTML"
 
           if grep -Eq '\bdb[[:space:]]*=[[:space:]]*x\b' "$HTML"; then
-            echo "ERROR: Old destructive db=x restore detected."
+            echo "ERROR: Destructive db=x restore detected."
             exit 1
           fi
 
@@ -337,15 +404,32 @@ jobs:
 
 
       # ============================================================
-      # 16) سجل الحركات
+      # 18) Verify Full Backup
+      # ============================================================
+      - name: Verify Full Backup
+        shell: bash
+        run: |
+          set -e
+
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+          MAIN="$PROJECT_DIR/app/src/main/java/com/kayan/vethospital/MainActivity.java"
+
+          grep -Fq "exportFullBackup" "$HTML"
+          grep -Fq "exportBackup" "$MAIN"
+
+          echo "Full Backup verified."
+
+
+      # ============================================================
+      # 19) Verify Movement History
       # ============================================================
       - name: Verify Full Movement History
         shell: bash
         run: |
           set -e
 
-          MAIN="$PROJECT_DIR/app/src/main/java/com/kayan/vethospital/MainActivity.java"
           HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+          MAIN="$PROJECT_DIR/app/src/main/java/com/kayan/vethospital/MainActivity.java"
 
           echo "Checking movement history..."
 
@@ -353,14 +437,13 @@ jobs:
           grep -Fq "عرض كل الحركات بدون أي حد أقصى" "$HTML"
           grep -Fq "movesVisibleCount" "$HTML"
 
-          # حماية سجل الحركات من حذف جهاز آخر
           grep -Fq 'if (!"moves".equals(name))' "$MAIN"
 
-          echo "Movement history verified."
+          echo "Full movement history verified."
 
 
       # ============================================================
-      # 17) Medicine Stock
+      # 20) Verify Medicine Stock
       # ============================================================
       - name: Verify Medicine Stock
         shell: bash
@@ -376,7 +459,7 @@ jobs:
 
 
       # ============================================================
-      # 18) Feed Stock
+      # 21) Verify Feed Stock
       # ============================================================
       - name: Verify Feed Stock
         shell: bash
@@ -392,7 +475,7 @@ jobs:
 
 
       # ============================================================
-      # 19) جهات الصرف
+      # 22) Verify Dispensing Destinations
       # ============================================================
       - name: Verify Dispensing Destinations
         shell: bash
@@ -406,6 +489,7 @@ jobs:
           grep -Fq "function getDispenseDestinations()" "$HTML"
 
           grep -Fq "Array.from({length:10}" "$HTML"
+
           grep -Fq "'الكلية الحربية'" "$HTML"
           grep -Fq "'الأوليمبية'" "$HTML"
 
@@ -413,7 +497,7 @@ jobs:
 
 
       # ============================================================
-      # 20) 10 Stables × 25 Boxes
+      # 23) Verify 10 Stables × 25 Boxes
       # ============================================================
       - name: Verify Stable Structure
         shell: bash
@@ -429,7 +513,7 @@ jobs:
 
 
       # ============================================================
-      # 21) بيانات الخيل
+      # 24) Verify Horse Data
       # ============================================================
       - name: Verify Horse Data
         shell: bash
@@ -459,7 +543,7 @@ jobs:
 
 
       # ============================================================
-      # 22) Horse QR
+      # 25) Verify Horse QR
       # ============================================================
       - name: Verify Horse QR
         shell: bash
@@ -477,7 +561,7 @@ jobs:
 
 
       # ============================================================
-      # 23) التقرير الشامل للحصان
+      # 26) Verify Horse Comprehensive Report
       # ============================================================
       - name: Verify Horse Comprehensive Report
         shell: bash
@@ -486,7 +570,7 @@ jobs:
 
           HTML="$PROJECT_DIR/app/src/main/assets/index.html"
 
-          echo "Checking comprehensive horse report..."
+          echo "Checking horse report..."
 
           grep -Fq "function openHorseReport(id)" "$HTML"
 
@@ -500,7 +584,7 @@ jobs:
 
 
       # ============================================================
-      # 24) نظام التغذية
+      # 27) Verify Feeding System
       # ============================================================
       - name: Verify Feeding System
         shell: bash
@@ -509,7 +593,7 @@ jobs:
 
           HTML="$PROJECT_DIR/app/src/main/assets/index.html"
 
-          echo "Checking six daily feeding slots..."
+          echo "Checking six feeding slots..."
 
           grep -Fq 'name="feed05"' "$HTML"
           grep -Fq 'name="light08"' "$HTML"
@@ -520,7 +604,7 @@ jobs:
 
           echo "Six feeding slots verified."
 
-          echo "Checking feed calculations..."
+          echo "Checking feed calculation functions..."
 
           grep -Fq "function v2NormFeedName" "$HTML"
           grep -Fq "function v2FeedPackageKg" "$HTML"
@@ -548,7 +632,7 @@ jobs:
 
 
       # ============================================================
-      # 25) Date Entry
+      # 28) Verify Easy Date Entry
       # ============================================================
       - name: Verify Easy Date Entry
         shell: bash
@@ -564,7 +648,7 @@ jobs:
 
 
       # ============================================================
-      # 26) Admin / User Permissions
+      # 29) Verify User Permissions
       # ============================================================
       - name: Verify User Permissions
         shell: bash
@@ -584,11 +668,11 @@ jobs:
 
           grep -Fq "admin-only" "$HTML"
 
-          echo "Permissions verified."
+          echo "Admin/User permissions verified."
 
 
       # ============================================================
-      # 27) Hospital Revenues
+      # 30) Verify Hospital Revenues
       # ============================================================
       - name: Verify Hospital Revenues
         shell: bash
@@ -615,81 +699,7 @@ jobs:
 
 
       # ============================================================
-      # 28) التقارير الشهرية
-      # ============================================================
-      - name: Verify Monthly Report
-        shell: bash
-        run: |
-          set -e
-
-          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
-
-          grep -Fq "reportMonth" "$HTML"
-          grep -Fq "monthlyDataForKey" "$HTML"
-          grep -Fq "renderReports" "$HTML"
-
-          echo "Monthly report verified."
-
-
-      # ============================================================
-      # 29) التقارير السنوية
-      # ============================================================
-      - name: Verify Annual Report
-        shell: bash
-        run: |
-          set -e
-
-          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
-
-          grep -Fq "reportYear" "$HTML"
-          grep -Fq "getAnnualReportData" "$HTML"
-          grep -Fq "renderAnnualReport" "$HTML"
-
-          echo "Annual report verified."
-
-
-      # ============================================================
-      # 30) No Charts
-      # ============================================================
-      - name: Verify Reports Have No Charts
-        shell: bash
-        run: |
-          set -e
-
-          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
-
-          echo "Checking reports contain no charts..."
-
-          if grep -Fq "simpleBarChartHTML(" "$HTML"; then
-            echo "ERROR: Chart code still exists."
-            exit 1
-          fi
-
-          if grep -Fq "renderMonthlyCharts(" "$HTML"; then
-            echo "ERROR: Monthly chart code still exists."
-            exit 1
-          fi
-
-          if grep -Fq "printableChartsHTML(" "$HTML"; then
-            echo "ERROR: Printable chart code still exists."
-            exit 1
-          fi
-
-          if grep -Fq 'id="monthlyCharts"' "$HTML"; then
-            echo "ERROR: Monthly chart container still exists."
-            exit 1
-          fi
-
-          if grep -Fq 'id="annualCharts"' "$HTML"; then
-            echo "ERROR: Annual chart container still exists."
-            exit 1
-          fi
-
-          echo "Reports have no charts."
-
-
-      # ============================================================
-      # 31) Chief Signature
+      # 31) Verify Veterinary Chief Signature
       # ============================================================
       - name: Verify Veterinary Chief Signature
         shell: bash
@@ -701,11 +711,11 @@ jobs:
           grep -Fq "رائد / محمد الصواف" "$HTML"
           grep -Fq "رئيس القسم البيطري" "$HTML"
 
-          echo "Chief signature verified."
+          echo "Veterinary chief signature verified."
 
 
       # ============================================================
-      # 32) Print / PDF
+      # 32) Verify Printing / PDF
       # ============================================================
       - name: Verify Printing and PDF
         shell: bash
@@ -724,7 +734,7 @@ jobs:
 
 
       # ============================================================
-      # 33) Fixed Signing Key
+      # 33) Verify Fixed Signing Key
       # ============================================================
       - name: Verify Fixed Signing Key
         shell: bash
@@ -739,11 +749,11 @@ jobs:
           grep -Fq "kayan-vet-release.keystore" "$GRADLE"
           grep -Fq "signingConfig signingConfigs.release" "$GRADLE"
 
-          echo "Fixed signing key verified."
+          echo "Fixed signing configuration verified."
 
 
       # ============================================================
-      # 34) Gradle Info
+      # 34) Show Gradle Information
       # ============================================================
       - name: Show Gradle Information
         shell: bash
@@ -756,7 +766,7 @@ jobs:
 
 
       # ============================================================
-      # 35) Clean
+      # 35) Clean Project
       # ============================================================
       - name: Clean Android Project
         shell: bash
@@ -773,7 +783,7 @@ jobs:
 
 
       # ============================================================
-      # 36) Build Release
+      # 36) Build Signed Release APK
       # ============================================================
       - name: Build Signed Release APK
         shell: bash
@@ -783,7 +793,7 @@ jobs:
           cd "$PROJECT_DIR"
 
           echo "============================================"
-          echo "Building Kayan Vet Hospital V3.2.4"
+          echo "Building Kayan Vet Hospital V3.2.5"
           echo "============================================"
 
           gradle assembleRelease --stacktrace
@@ -800,6 +810,8 @@ jobs:
         run: |
           set -e
 
+          echo "Searching for Release APK..."
+
           APK=$(find \
             "$PROJECT_DIR/app/build/outputs/apk/release" \
             -type f \
@@ -809,6 +821,7 @@ jobs:
           if [ -z "$APK" ]; then
             echo "ERROR: Release APK was not generated."
             echo ""
+            echo "Build output:"
             find "$PROJECT_DIR/app/build/outputs" -type f || true
             exit 1
           fi
@@ -831,11 +844,11 @@ jobs:
 
           jarsigner -verify "$APK"
 
-          echo "APK signature verified."
+          echo "APK signature verified successfully."
 
 
       # ============================================================
-      # 39) Final APK Name
+      # 39) Prepare Final APK
       # ============================================================
       - name: Prepare Final APK
         shell: bash
@@ -844,7 +857,7 @@ jobs:
 
           mkdir -p apk-output
 
-          FINAL_APK="apk-output/Kayan-Vet-Hospital-V3.2.4-SIGNED.apk"
+          FINAL_APK="apk-output/Kayan-Vet-Hospital-V3.2.5-SIGNED.apk"
 
           cp "$APK" "$FINAL_APK"
 
@@ -857,12 +870,12 @@ jobs:
 
 
       # ============================================================
-      # 40) Upload Artifact
+      # 40) Upload APK Artifact
       # ============================================================
-      - name: Upload Kayan Vet V3.2.4 APK
+      - name: Upload Kayan Vet V3.2.5 APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kayan-Vet-Hospital-V3.2.4-SIGNED
-          path: apk-output/Kayan-Vet-Hospital-V3.2.4-SIGNED.apk
+          name: Kayan-Vet-Hospital-V3.2.5-SIGNED
+          path: apk-output/Kayan-Vet-Hospital-V3.2.5-SIGNED.apk
           if-no-files-found: error
           retention-days: 30
