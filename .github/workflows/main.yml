@@ -1,4 +1,4 @@
-name: Build Kayan Vet V3.2.0 Live Sync Signed APK
+name: Build Kayan Vet V3.2.3 Signed APK
 
 on:
   workflow_dispatch:
@@ -11,35 +11,54 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
+      # ============================================================
+      # 1. تحميل ملفات المشروع من GitHub
+      # ============================================================
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+
+      # ============================================================
+      # 2. تثبيت Java 17
+      # ============================================================
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
+
+      # ============================================================
+      # 3. تثبيت Gradle 8.11.1
+      # ============================================================
       - name: Setup Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
 
-      - name: Find and Extract Kayan Vet V3.2.0
+
+      # ============================================================
+      # 4. البحث عن ZIP النسخة V3.2.3 وفك الضغط
+      # ============================================================
+      - name: Find and Extract Kayan Vet V3.2.3
         shell: bash
         run: |
           set -e
 
-          echo "Searching for Kayan Vet V3.2.0 ZIP..."
+          echo "========================================"
+          echo "Searching for Kayan Vet V3.2.3 ZIP..."
+          echo "========================================"
 
-          ZIP_FILE=$(find . -maxdepth 3 -type f \
-            -name "KayanVetAndroid_V3.2.0_LIVE_FIRESTORE_SYNC_FIXED_SIGNING*.zip" \
+          ZIP_FILE=$(find . -maxdepth 4 -type f \
+            -name "KayanVetAndroid_V3.2.3_SAFE_RESTORE_NO_CHARTS_FULL_HISTORY_LIVE_SYNC_FIXED_SIGNING*.zip" \
             | head -1)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: Kayan Vet V3.2.0 ZIP file was not found."
-            echo "Files currently in repository:"
-            find . -maxdepth 3 -type f
+            echo "ERROR: V3.2.3 ZIP file was not found."
+            echo ""
+            echo "Files currently available:"
+            find . -maxdepth 4 -type f
             exit 1
           fi
 
@@ -49,7 +68,6 @@ jobs:
           rm -rf extracted_project
           mkdir -p extracted_project
 
-          echo "Extracting Android project..."
           unzip -q "$ZIP_FILE" -d extracted_project
 
           PROJECT_DIR=$(find extracted_project \
@@ -59,99 +77,120 @@ jobs:
             | head -1)
 
           if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: Android project was not found after extraction."
-            find extracted_project -maxdepth 4 -type f
+            echo "ERROR: Android project not found after extraction."
+            find extracted_project -maxdepth 5 -type f
             exit 1
           fi
 
-          echo "Android project found at:"
+          echo ""
+          echo "Android project found:"
           echo "$PROJECT_DIR"
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Check Required Project Files
+
+      # ============================================================
+      # 5. التأكد من الملفات الأساسية
+      # ============================================================
+      - name: Verify Required Project Files
         shell: bash
         run: |
           set -e
 
-          echo "Checking required Android files..."
+          echo "Checking Android project files..."
 
-          test -f "$PROJECT_DIR/settings.gradle" || \
-          test -f "$PROJECT_DIR/settings.gradle.kts"
+          if [ ! -f "$PROJECT_DIR/settings.gradle" ] && \
+             [ ! -f "$PROJECT_DIR/settings.gradle.kts" ]; then
+            echo "ERROR: settings.gradle not found."
+            exit 1
+          fi
 
-          test -f "$PROJECT_DIR/app/build.gradle" || \
-          test -f "$PROJECT_DIR/app/build.gradle.kts"
+          if [ ! -f "$PROJECT_DIR/app/build.gradle" ] && \
+             [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ]; then
+            echo "ERROR: app/build.gradle not found."
+            exit 1
+          fi
 
-          test -f "$PROJECT_DIR/app/google-services.json"
-
+          test -f "$PROJECT_DIR/app/src/main/AndroidManifest.xml"
           test -f "$PROJECT_DIR/app/src/main/assets/index.html"
-
+          test -f "$PROJECT_DIR/app/google-services.json"
           test -f "$PROJECT_DIR/app/kayan-vet-release.keystore"
 
-          echo "All required project files found."
+          echo "All required files are present."
 
-      - name: Enable AndroidX
+
+      # ============================================================
+      # 6. تفعيل AndroidX + Jetifier
+      # ============================================================
+      - name: Enable AndroidX and Jetifier
         shell: bash
         run: |
           set -e
 
           touch "$PROJECT_DIR/gradle.properties"
 
-          if grep -q '^android.useAndroidX=' "$PROJECT_DIR/gradle.properties"; then
+          if grep -q '^android.useAndroidX=' \
+            "$PROJECT_DIR/gradle.properties"; then
+
             sed -i \
               's/^android.useAndroidX=.*/android.useAndroidX=true/' \
               "$PROJECT_DIR/gradle.properties"
+
           else
+
             echo "android.useAndroidX=true" \
               >> "$PROJECT_DIR/gradle.properties"
+
           fi
 
-          if grep -q '^android.enableJetifier=' "$PROJECT_DIR/gradle.properties"; then
+          if grep -q '^android.enableJetifier=' \
+            "$PROJECT_DIR/gradle.properties"; then
+
             sed -i \
               's/^android.enableJetifier=.*/android.enableJetifier=true/' \
               "$PROJECT_DIR/gradle.properties"
+
           else
+
             echo "android.enableJetifier=true" \
               >> "$PROJECT_DIR/gradle.properties"
+
           fi
 
-          echo "AndroidX enabled."
+          echo ""
+          echo "gradle.properties:"
+          cat "$PROJECT_DIR/gradle.properties"
 
-      - name: Verify Core Features
+
+      # ============================================================
+      # 7. التأكد من Firebase
+      # ============================================================
+      - name: Verify Firebase Configuration
         shell: bash
         run: |
           set -e
 
-          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+          MAIN="$PROJECT_DIR/app/src/main/java/com/kayan/vethospital/MainActivity.java"
 
-          echo "Checking Firestore sync..."
-          grep -q "AndroidBridge.syncData" "$HTML"
+          echo "Checking Firebase configuration..."
 
-          echo "Checking safe merge..."
-          grep -q "kayanSafeMergeDB" "$HTML"
+          test -f "$PROJECT_DIR/app/google-services.json"
 
-          echo "Checking Full Backup..."
-          grep -q "exportFullBackup" "$HTML"
+          grep -q "FirebaseFirestore.getInstance()" "$MAIN"
 
-          echo "Checking Restore Backup..."
-          grep -q "restoreFullBackupFile" "$HTML"
+          grep -q '"medicines"' "$MAIN"
+          grep -q '"feed"' "$MAIN"
+          grep -q '"horses"' "$MAIN"
+          grep -q '"cases"' "$MAIN"
+          grep -q '"moves"' "$MAIN"
+          grep -q '"revenues"' "$MAIN"
 
-          echo "Checking administrator permissions..."
-          grep -q "requireAdmin" "$HTML"
+          echo "Firebase configuration verified."
 
-          echo "Checking normal user view-only mode..."
-          grep -q "readonly-user" "$HTML"
 
-          echo "Checking medicine stock requests..."
-          grep -q "openStockModal('medicine','in')" "$HTML"
-          grep -q "openStockModal('medicine','out')" "$HTML"
-
-          echo "Checking feed stock requests..."
-          grep -q "openStockModal('feed','in')" "$HTML"
-          grep -q "openStockModal('feed','out')" "$HTML"
-
-          echo "Core features verified."
-
+      # ============================================================
+      # 8. التأكد من Live Sync
+      # ============================================================
       - name: Verify Live Firestore Sync
         shell: bash
         run: |
@@ -160,21 +199,184 @@ jobs:
           MAIN="$PROJECT_DIR/app/src/main/java/com/kayan/vethospital/MainActivity.java"
           HTML="$PROJECT_DIR/app/src/main/assets/index.html"
 
-          echo "Checking realtime Firestore listeners..."
+          echo "Checking realtime synchronization..."
+
+          grep -q "ListenerRegistration" "$MAIN"
           grep -q "startRealtimeCloudSync" "$MAIN"
           grep -q "addSnapshotListener" "$MAIN"
           grep -q "scheduleRealtimeCloudRefresh" "$MAIN"
-          grep -q "ListenerRegistration" "$MAIN"
+          grep -q "readAllCloudData" "$MAIN"
 
-          echo "Checking realtime connected callback..."
           grep -q "KayanRealtimeConnected" "$HTML"
 
-          echo "Checking realtime status text..."
-          grep -q "مزامنة مباشرة بين الأجهزة مفعلة" "$HTML"
+          echo "Live Firestore Sync verified."
 
-          echo "Live Firestore sync verified."
 
-      - name: Verify Hospital Revenue
+      # ============================================================
+      # 9. التأكد من حماية سجل الحركات
+      # ============================================================
+      - name: Verify Full Movement History
+        shell: bash
+        run: |
+          set -e
+
+          MAIN="$PROJECT_DIR/app/src/main/java/com/kayan/vethospital/MainActivity.java"
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo "Checking movement history..."
+
+          grep -q "function renderMoves()" "$HTML"
+
+          grep -q \
+            "عرض كل الحركات بدون أي حد أقصى" \
+            "$HTML"
+
+          grep -q "movesVisibleCount" "$HTML"
+
+          grep -q \
+            'if (!"moves".equals(name))' \
+            "$MAIN"
+
+          echo "Full movement history protection verified."
+
+
+      # ============================================================
+      # 10. التأكد من صرف الأدوية
+      # ============================================================
+      - name: Verify Medicine Stock
+        shell: bash
+        run: |
+          set -e
+
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo "Checking medicine stock..."
+
+          grep -q \
+            "openStockModal('medicine','in')" \
+            "$HTML"
+
+          grep -q \
+            "openStockModal('medicine','out')" \
+            "$HTML"
+
+          echo "Medicine stock verified."
+
+
+      # ============================================================
+      # 11. التأكد من صرف العلف
+      # ============================================================
+      - name: Verify Feed Stock
+        shell: bash
+        run: |
+          set -e
+
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo "Checking feed stock..."
+
+          grep -q \
+            "openStockModal('feed','in')" \
+            "$HTML"
+
+          grep -q \
+            "openStockModal('feed','out')" \
+            "$HTML"
+
+          echo "Feed stock verified."
+
+
+      # ============================================================
+      # 12. التأكد من جهات الصرف
+      # اسطبل 1 - 10
+      # الكلية الحربية
+      # الأوليمبية
+      # ============================================================
+      - name: Verify Dispensing Destinations
+        shell: bash
+        run: |
+          set -e
+
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo "Checking dispensing destinations..."
+
+          grep -q \
+            "function getDispenseDestinations()" \
+            "$HTML"
+
+          grep -q \
+            "Array.from({length:10}" \
+            "$HTML"
+
+          grep -q \
+            "'الكلية الحربية'" \
+            "$HTML"
+
+          grep -q \
+            "'الأوليمبية'" \
+            "$HTML"
+
+          echo "Dispensing destinations verified."
+
+
+      # ============================================================
+      # 13. التأكد من نظام 10 اسطبلات × 25 بوكس
+      # ============================================================
+      - name: Verify Stable Structure
+        shell: bash
+        run: |
+          set -e
+
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo "Checking stable structure..."
+
+          grep -q \
+            "Array.from({length:10}" \
+            "$HTML"
+
+          grep -q \
+            "Array.from({length:25}" \
+            "$HTML"
+
+          echo "10 stables x 25 boxes verified."
+
+
+      # ============================================================
+      # 14. التأكد من بيانات الخيل
+      # ============================================================
+      - name: Verify Horse Data
+        shell: bash
+        run: |
+          set -e
+
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo "Checking horse information..."
+
+          grep -q 'name="imageFile"' "$HTML"
+          grep -q 'name="passportImageFile"' "$HTML"
+
+          grep -q "birthDate" "$HTML"
+          grep -q "calculateHorseAge" "$HTML"
+
+          grep -q 'name="weight"' "$HTML"
+          grep -q 'name="height"' "$HTML"
+
+          grep -q "passportNo" "$HTML"
+          grep -q "ownership" "$HTML"
+          grep -q "rider" "$HTML"
+          grep -q "horseType" "$HTML"
+          grep -q "workStatus" "$HTML"
+
+          echo "Horse information verified."
+
+
+      # ============================================================
+      # 15. التأكد من QR لكل حصان
+      # ============================================================
+      - name: Verify Horse QR
         shell: bash
         run: |
           set -e
@@ -182,26 +384,97 @@ jobs:
           HTML="$PROJECT_DIR/app/src/main/assets/index.html"
           MAIN="$PROJECT_DIR/app/src/main/java/com/kayan/vethospital/MainActivity.java"
 
-          echo "Checking revenue page..."
-          grep -q 'id="revenues"' "$HTML"
+          echo "Checking Horse QR..."
 
-          echo "Checking revenue navigation..."
-          grep -q 'data-view="revenues"' "$HTML"
+          grep -q "openHorseQR" "$HTML"
+          grep -q "generateQr" "$HTML"
+          grep -q "generateQr" "$MAIN"
 
-          echo "Checking revenue functions..."
-          grep -q "openRevenueModal" "$HTML"
-          grep -q "saveRevenue" "$HTML"
-          grep -q "renderRevenues" "$HTML"
+          echo "Horse QR verified."
 
-          echo "Checking revenue totals..."
-          grep -q "revenueTotal" "$HTML"
-          grep -q "revenueMonth" "$HTML"
 
-          echo "Checking Firestore revenue collection..."
-          grep -q '"revenues"' "$MAIN"
+      # ============================================================
+      # 16. التأكد من التقرير الشامل للحصان
+      # ============================================================
+      - name: Verify Horse Comprehensive Report
+        shell: bash
+        run: |
+          set -e
 
-          echo "Hospital revenue verified."
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
 
+          echo "Checking comprehensive horse report..."
+
+          grep -q "openHorseReport" "$HTML"
+
+          grep -q \
+            "الحالات المرضية" \
+            "$HTML"
+
+          grep -q \
+            "الأدوية المصروفة للحصان" \
+            "$HTML"
+
+          grep -q \
+            "برنامج التغذية الحالي" \
+            "$HTML"
+
+          grep -q \
+            "سجل تغييرات العلف" \
+            "$HTML"
+
+          grep -q "feedHistory" "$HTML"
+          grep -q "recordFeedingChange" "$HTML"
+
+          echo "Horse comprehensive report verified."
+
+
+      # ============================================================
+      # 17. التأكد من نظام التغذية
+      # ============================================================
+      - name: Verify Feeding System
+        shell: bash
+        run: |
+          set -e
+
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo "Checking six daily feeding slots..."
+
+          grep -q "feed05" "$HTML"
+          grep -q "light08" "$HTML"
+          grep -q "feed11" "$HTML"
+          grep -q "feed17" "$HTML"
+          grep -q "light20" "$HTML"
+          grep -q "feed23" "$HTML"
+
+          echo "Checking feed calculations..."
+
+          grep -q "v2FeedConsumption" "$HTML"
+          grep -q "v2FeedStockKg" "$HTML"
+
+          grep -q \
+            ".filter(x=>v2NormFeedName(x.name)===key)" \
+            "$HTML"
+
+          grep -q \
+            ".reduce((sum,item)=>sum+v2FeedStockKg(item),0)" \
+            "$HTML"
+
+          grep -q \
+            "monthly=daily*30" \
+            "$HTML"
+
+          grep -q \
+            "if(qty>25)" \
+            "$HTML"
+
+          echo "Feeding system verified."
+
+
+      # ============================================================
+      # 18. التأكد من الإدخال السريع للتاريخ
+      # ============================================================
       - name: Verify Easy Date Entry
         shell: bash
         run: |
@@ -214,7 +487,35 @@ jobs:
 
           echo "Easy date entry verified."
 
-      - name: Verify Horse QR
+
+      # ============================================================
+      # 19. التأكد من صلاحيات Admin و User
+      # ============================================================
+      - name: Verify User Permissions
+        shell: bash
+        run: |
+          set -e
+
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo "Checking administrator permissions..."
+
+          grep -q "requireAdmin" "$HTML"
+          grep -q "readonly-user" "$HTML"
+
+          grep -q \
+            "new Set(\['dashboard','horses','stables','cases'\])" \
+            "$HTML"
+
+          grep -q "admin-only" "$HTML"
+
+          echo "Admin/User permissions verified."
+
+
+      # ============================================================
+      # 20. التأكد من الإيرادات
+      # ============================================================
+      - name: Verify Hospital Revenues
         shell: bash
         run: |
           set -e
@@ -222,39 +523,27 @@ jobs:
           HTML="$PROJECT_DIR/app/src/main/assets/index.html"
           MAIN="$PROJECT_DIR/app/src/main/java/com/kayan/vethospital/MainActivity.java"
 
-          grep -q "openHorseQR" "$HTML"
-          grep -q "generateQr" "$HTML"
-          grep -q "generateQr" "$MAIN"
+          echo "Checking hospital revenues..."
 
-          echo "Horse QR verified."
+          grep -q 'id="revenues"' "$HTML"
+          grep -q 'data-view="revenues"' "$HTML"
 
-      - name: Verify Horse Comprehensive Report
-        shell: bash
-        run: |
-          set -e
+          grep -q "openRevenueModal" "$HTML"
+          grep -q "saveRevenue" "$HTML"
+          grep -q "renderRevenues" "$HTML"
 
-          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+          grep -q "revenueTotal" "$HTML"
+          grep -q "revenueMonth" "$HTML"
 
-          echo "Checking horse report..."
-          grep -q "openHorseReport" "$HTML"
-          grep -q "printHorseReport" "$HTML"
+          grep -q '"revenues"' "$MAIN"
 
-          echo "Checking medical history..."
-          grep -q "الحالات المرضية" "$HTML"
+          echo "Hospital revenues verified."
 
-          echo "Checking medication history..."
-          grep -q "الأدوية المصروفة للحصان" "$HTML"
 
-          echo "Checking feeding schedule..."
-          grep -q "برنامج التغذية الحالي" "$HTML"
-
-          echo "Checking feed change history..."
-          grep -q "سجل تغييرات العلف" "$HTML"
-          grep -q "recordFeedingChange" "$HTML"
-
-          echo "Horse comprehensive report verified."
-
-      - name: Verify PDF And Printing
+      # ============================================================
+      # 21. التأكد من Full Backup
+      # ============================================================
+      - name: Verify Full Backup
         shell: bash
         run: |
           set -e
@@ -262,78 +551,271 @@ jobs:
           HTML="$PROJECT_DIR/app/src/main/assets/index.html"
           MAIN="$PROJECT_DIR/app/src/main/java/com/kayan/vethospital/MainActivity.java"
 
-          echo "Checking PDF / print functions..."
-          grep -q "printReportElement" "$HTML"
-          grep -q "printReportHtml" "$HTML"
+          echo "Checking Full Backup..."
+
+          grep -q "exportFullBackup" "$HTML"
+          grep -q "exportBackup" "$MAIN"
+
+          echo "Full Backup verified."
+
+
+      # ============================================================
+      # 22. التأكد من Safe Restore
+      # وعدم وجود db=x
+      # ============================================================
+      - name: Verify Safe Backup Restore
+        shell: bash
+        run: |
+          set -e
+
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo "Checking Safe Restore..."
+
+          grep -q "kayanSafeMergeDB" "$HTML"
+          grep -q "kayanNormalizeDB" "$HTML"
+
+          grep -q \
+            "kayanNormalizeDB(kayanSafeMergeDB(db,x))" \
+            "$HTML"
+
+          if grep -Eq '\bdb[[:space:]]*=[[:space:]]*x\b' "$HTML"; then
+            echo "ERROR: Destructive db=x restore detected."
+            exit 1
+          fi
+
+          echo "Safe Restore verified."
+
+
+      # ============================================================
+      # 23. التأكد من عدم وجود الرسومات البيانية
+      # ============================================================
+      - name: Verify Reports Have No Charts
+        shell: bash
+        run: |
+          set -e
+
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo "Checking that report charts are removed..."
+
+          if grep -q "simpleBarChartHTML(" "$HTML"; then
+            echo "ERROR: Chart function still exists."
+            exit 1
+          fi
+
+          if grep -q "renderMonthlyCharts(" "$HTML"; then
+            echo "ERROR: Monthly chart function still exists."
+            exit 1
+          fi
+
+          if grep -q "printableChartsHTML(" "$HTML"; then
+            echo "ERROR: Printable charts still exist."
+            exit 1
+          fi
+
+          if grep -q 'id="monthlyCharts"' "$HTML"; then
+            echo "ERROR: Monthly chart container still exists."
+            exit 1
+          fi
+
+          if grep -q 'id="annualCharts"' "$HTML"; then
+            echo "ERROR: Annual chart container still exists."
+            exit 1
+          fi
+
+          echo "Reports contain tables/data only."
+
+
+      # ============================================================
+      # 24. التأكد من التقارير الشهرية والسنوية
+      # ============================================================
+      - name: Verify Monthly and Annual Reports
+        shell: bash
+        run: |
+          set -e
+
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo "Checking monthly reports..."
+
+          grep -q "reportMonth" "$HTML"
+          grep -q "monthlyDataForKey" "$HTML"
+          grep -q "renderReports" "$HTML"
+
+          echo "Checking annual reports..."
+
+          grep -q "reportYear" "$HTML"
+          grep -q "getAnnualReportData" "$HTML"
+          grep -q "renderAnnualReport" "$HTML"
+
+          echo "Monthly and annual reports verified."
+
+
+      # ============================================================
+      # 25. التأكد من اسم رئيس القسم البيطري
+      # ============================================================
+      - name: Verify Veterinary Chief Signature
+        shell: bash
+        run: |
+          set -e
+
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+
+          grep -q \
+            "رائد / محمد الصواف" \
+            "$HTML"
+
+          grep -q \
+            "رئيس القسم البيطري" \
+            "$HTML"
+
+          echo "Veterinary chief signature verified."
+
+
+      # ============================================================
+      # 26. التأكد من الطباعة و PDF
+      # ============================================================
+      - name: Verify Printing and PDF
+        shell: bash
+        run: |
+          set -e
+
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+          MAIN="$PROJECT_DIR/app/src/main/java/com/kayan/vethospital/MainActivity.java"
+
+          echo "Checking printing..."
+
           grep -q "printCurrentPage" "$MAIN"
           grep -q "PrintManager" "$MAIN"
 
-          echo "Checking report signature..."
-          grep -q "الرائد / محمد الصواف" "$HTML"
-          grep -q "رئيس القسم البيطري" "$HTML"
+          grep -q "printReport" "$HTML"
 
-          echo "PDF and printing verified."
+          echo "Printing/PDF verified."
 
-      - name: Verify Firestore Collections
-        shell: bash
-        run: |
-          set -e
 
-          MAIN="$PROJECT_DIR/app/src/main/java/com/kayan/vethospital/MainActivity.java"
-
-          echo "Checking Firestore collections..."
-
-          grep -q '"medicines"' "$MAIN"
-          grep -q '"feed"' "$MAIN"
-          grep -q '"horses"' "$MAIN"
-          grep -q '"cases"' "$MAIN"
-          grep -q '"moves"' "$MAIN"
-          grep -q '"revenues"' "$MAIN"
-
-          echo "Firestore collections verified."
-
-      - name: Verify Fixed Signing
+      # ============================================================
+      # 27. التأكد من مفتاح التوقيع الثابت
+      # ============================================================
+      - name: Verify Fixed Signing Key
         shell: bash
         run: |
           set -e
 
           echo "Checking fixed signing key..."
 
-          test -f "$PROJECT_DIR/app/kayan-vet-release.keystore"
+          test -f \
+            "$PROJECT_DIR/app/kayan-vet-release.keystore"
 
-          grep -q "signingConfigs" "$PROJECT_DIR/app/build.gradle"
-          grep -q "release" "$PROJECT_DIR/app/build.gradle"
+          grep -q \
+            "signingConfigs" \
+            "$PROJECT_DIR/app/build.gradle"
 
-          echo "Fixed signing verified."
+          grep -q \
+            "kayan-vet-release.keystore" \
+            "$PROJECT_DIR/app/build.gradle"
 
+          echo "Fixed signing key verified."
+
+
+      # ============================================================
+      # 28. التأكد من Android SDK
+      # ============================================================
+      - name: Verify Android SDK Configuration
+        shell: bash
+        run: |
+          set -e
+
+          GRADLE="$PROJECT_DIR/app/build.gradle"
+
+          echo "Checking Android SDK..."
+
+          grep -q "compileSdk 36" "$GRADLE"
+          grep -q "targetSdk 36" "$GRADLE"
+
+          echo "Android SDK configuration verified."
+
+
+      # ============================================================
+      # 29. التأكد من Internet Permission
+      # ============================================================
+      - name: Verify Internet Permission
+        shell: bash
+        run: |
+          set -e
+
+          MANIFEST="$PROJECT_DIR/app/src/main/AndroidManifest.xml"
+
+          grep -q \
+            "android.permission.INTERNET" \
+            "$MANIFEST"
+
+          echo "Internet permission verified."
+
+
+      # ============================================================
+      # 30. التأكد من رقم النسخة
+      # ============================================================
+      - name: Verify Version V3.2.3
+        shell: bash
+        run: |
+          set -e
+
+          GRADLE="$PROJECT_DIR/app/build.gradle"
+
+          grep -q \
+            "versionCode 24" \
+            "$GRADLE"
+
+          grep -q \
+            "versionName '3.2.3'" \
+            "$GRADLE"
+
+          echo "Version V3.2.3 verified."
+
+
+      # ============================================================
+      # 31. Build Release APK
+      # ============================================================
       - name: Build Signed Release APK
         shell: bash
         run: |
           set -e
 
-          echo "Starting Android release build..."
+          echo "========================================"
+          echo "Building Kayan Vet Hospital V3.2.3..."
+          echo "========================================"
 
           cd "$PROJECT_DIR"
 
           gradle assembleRelease --stacktrace
 
-          echo "Gradle build completed."
+          echo ""
+          echo "Gradle build completed successfully."
 
+
+      # ============================================================
+      # 32. البحث عن APK الناتج
+      # ============================================================
       - name: Find Generated Release APK
         shell: bash
         run: |
           set -e
 
-          echo "Searching for release APK..."
+          echo "Searching for generated APK..."
 
-          APK=$(find "$PROJECT_DIR/app/build/outputs/apk/release" \
+          APK=$(find \
+            "$PROJECT_DIR/app/build/outputs/apk/release" \
             -type f \
             -name "*.apk" \
             | head -1)
 
           if [ -z "$APK" ]; then
             echo "ERROR: Release APK was not generated."
-            find "$PROJECT_DIR/app/build/outputs" -type f || true
+            echo ""
+            echo "Available build output:"
+            find "$PROJECT_DIR/app/build/outputs" \
+              -type f || true
             exit 1
           fi
 
@@ -342,6 +824,10 @@ jobs:
 
           echo "APK=$APK" >> "$GITHUB_ENV"
 
+
+      # ============================================================
+      # 33. التأكد من توقيع APK
+      # ============================================================
       - name: Verify APK Signature
         shell: bash
         run: |
@@ -351,8 +837,12 @@ jobs:
 
           jarsigner -verify "$APK"
 
-          echo "APK signature verified."
+          echo "APK signature verified successfully."
 
+
+      # ============================================================
+      # 34. تجهيز اسم APK النهائي
+      # ============================================================
       - name: Prepare Final APK
         shell: bash
         run: |
@@ -361,15 +851,23 @@ jobs:
           mkdir -p apk-output
 
           cp "$APK" \
-            "apk-output/Kayan-Vet-Hospital-V3.2.0-LIVE-SYNC-SIGNED.apk"
+            "apk-output/Kayan-Vet-Hospital-V3.2.3-SIGNED.apk"
 
-          echo "Final APK prepared:"
+          echo ""
+          echo "========================================"
+          echo "FINAL APK READY"
+          echo "========================================"
+
           ls -lh apk-output/
 
-      - name: Upload Signed APK
+
+      # ============================================================
+      # 35. رفع APK كـ Artifact
+      # ============================================================
+      - name: Upload Kayan Vet V3.2.3 APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kayan-Vet-Hospital-V3.2.0-LIVE-SYNC-SIGNED
-          path: apk-output/Kayan-Vet-Hospital-V3.2.0-LIVE-SYNC-SIGNED.apk
+          name: Kayan-Vet-Hospital-V3.2.3-SIGNED
+          path: apk-output/Kayan-Vet-Hospital-V3.2.3-SIGNED.apk
           if-no-files-found: error
           retention-days: 30
