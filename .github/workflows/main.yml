@@ -21,182 +21,43 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Gradle
+      - name: Setup Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
 
-      - name: Find or Extract Android Project
+      - name: Verify Project Files
         shell: bash
         run: |
-          echo "Searching for existing gradlew..."
-
-          GRADLEW_PATH=$(find . -maxdepth 5 -type f -name gradlew | head -n 1)
-
-          if [ -z "$GRADLEW_PATH" ]; then
-            echo "No extracted Android project found."
-            echo "Searching for Kayan Vet ZIP..."
-
-            ZIP_PATH=$(find . -maxdepth 2 -type f \
-              \( -name "*V3.3.0*.zip" -o -name "*V3.2.5*.zip" \) \
-              | sort -r \
-              | head -n 1)
-
-            if [ -z "$ZIP_PATH" ]; then
-              echo "ERROR: No suitable Kayan Vet ZIP found."
-              echo "Repository files:"
-              find . -maxdepth 3 -type f
-              exit 1
-            fi
-
-            echo "ZIP found:"
-            echo "$ZIP_PATH"
-
-            mkdir -p extracted_project
-
-            unzip -q "$ZIP_PATH" -d extracted_project
-
-            echo "ZIP extracted successfully."
-
-            GRADLEW_PATH=$(find extracted_project -maxdepth 6 -type f -name gradlew | head -n 1)
-
-            if [ -z "$GRADLEW_PATH" ]; then
-              echo "ERROR: gradlew not found inside ZIP."
-              echo "Extracted files:"
-              find extracted_project -maxdepth 4 -type f
-              exit 1
-            fi
-          fi
-
-          PROJECT_DIR=$(dirname "$GRADLEW_PATH")
-
-          echo "Gradle wrapper found at:"
-          echo "$GRADLEW_PATH"
-
-          echo "Android project directory:"
-          echo "$PROJECT_DIR"
-
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-          chmod +x "$GRADLEW_PATH"
-
-      - name: Restore Google Services File
-        shell: bash
-        env:
-          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
-        run: |
-          if [ -z "$GOOGLE_SERVICES_JSON_BASE64" ]; then
-            echo "ERROR: GOOGLE_SERVICES_JSON_BASE64 secret is missing."
-            exit 1
-          fi
-
-          mkdir -p "$PROJECT_DIR/app"
-
-          echo "$GOOGLE_SERVICES_JSON_BASE64" \
-            | base64 --decode \
-            > "$PROJECT_DIR/app/google-services.json"
-
-          echo "google-services.json restored successfully."
-
-      - name: Restore Signing Keystore
-        shell: bash
-        env:
-          KAYAN_KEYSTORE_BASE64: ${{ secrets.KAYAN_KEYSTORE_BASE64 }}
-        run: |
-          if [ -z "$KAYAN_KEYSTORE_BASE64" ]; then
-            echo "ERROR: KAYAN_KEYSTORE_BASE64 secret is missing."
-            exit 1
-          fi
-
-          echo "$KAYAN_KEYSTORE_BASE64" \
-            | base64 --decode \
-            > "$PROJECT_DIR/app/kayan-upload.jks"
-
-          echo "Keystore restored successfully."
-
-      - name: Create Keystore Properties
-        shell: bash
-        env:
-          STORE_PASSWORD: ${{ secrets.KAYAN_STORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KAYAN_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KAYAN_KEY_PASSWORD }}
-        run: |
-          if [ -z "$STORE_PASSWORD" ]; then
-            echo "ERROR: KAYAN_STORE_PASSWORD secret is missing."
-            exit 1
-          fi
-
-          if [ -z "$KEY_ALIAS" ]; then
-            echo "ERROR: KAYAN_KEY_ALIAS secret is missing."
-            exit 1
-          fi
-
-          if [ -z "$KEY_PASSWORD" ]; then
-            echo "ERROR: KAYAN_KEY_PASSWORD secret is missing."
-            exit 1
-          fi
-
-          cat > "$PROJECT_DIR/keystore.properties" <<EOF
-          storeFile=kayan-upload.jks
-          storePassword=$STORE_PASSWORD
-          keyAlias=$KEY_ALIAS
-          keyPassword=$KEY_PASSWORD
-          EOF
-
-          echo "keystore.properties created successfully."
-
-      - name: Show Project Structure
-        shell: bash
-        run: |
-          echo "PROJECT_DIR:"
-          echo "$PROJECT_DIR"
-
-          echo "Root files:"
-          ls -la "$PROJECT_DIR"
-
+          echo "Current directory:"
+          pwd
+          echo "Project files:"
+          ls -la
           echo "App files:"
-          ls -la "$PROJECT_DIR/app"
+          ls -la app
+          test -f settings.gradle
+          test -f build.gradle
+          test -f app/build.gradle
+          test -f app/google-services.json
 
-      - name: Clean Project
+      - name: Build Installable Debug APK
         shell: bash
         run: |
-          cd "$PROJECT_DIR"
-          ./gradlew clean --stacktrace
+          gradle clean assembleDebug --stacktrace
 
-      - name: Build Signed Release APK
-        shell: bash
-        run: |
-          cd "$PROJECT_DIR"
-          ./gradlew assembleRelease --stacktrace
-
-      - name: Find Generated APK
-        shell: bash
-        run: |
-          APK_PATH=$(find "$PROJECT_DIR/app/build/outputs/apk" \
-            -type f \
-            -name "*.apk" \
-            | grep release \
-            | head -n 1)
-
-          if [ -z "$APK_PATH" ]; then
-            echo "ERROR: Release APK not found."
-            echo "Build output:"
-            find "$PROJECT_DIR/app/build" -type f || true
-            exit 1
-          fi
-
-          echo "APK found:"
-          echo "$APK_PATH"
-
-          echo "APK_PATH=$APK_PATH" >> "$GITHUB_ENV"
-
-      - name: Prepare Final APK
+      - name: Prepare APK
         shell: bash
         run: |
           mkdir -p apk-output
+          APK_PATH=$(find app/build/outputs/apk/debug -type f -name "*.apk" | head -n 1)
 
-          cp "$APK_PATH" \
-            "apk-output/Kayan-Vet-Hospital-V3.3.0-SIGNED.apk"
+          if [ -z "$APK_PATH" ]; then
+            echo "ERROR: APK was not generated"
+            find app/build -type f || true
+            exit 1
+          fi
 
-          echo "Final APK prepared successfully."
+          cp "$APK_PATH" "apk-output/Kayan-Vet-Hospital-V3.3.0.apk"
 
           ls -lh apk-output
 
@@ -204,6 +65,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Kayan-Vet-Hospital-V3.3.0
-          path: apk-output/Kayan-Vet-Hospital-V3.3.0-SIGNED.apk
+          path: apk-output/Kayan-Vet-Hospital-V3.3.0.apk
           if-no-files-found: error
           retention-days: 30
