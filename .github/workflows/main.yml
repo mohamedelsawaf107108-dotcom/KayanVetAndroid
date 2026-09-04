@@ -1,21 +1,17 @@
-name: Build My Life V1.3 APK
+name: Build My Life V1.4 Permanent Signed APK
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
   build:
-    name: Build My Life V1.3 Android
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout Repository
         uses: actions/checkout@v4
-
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -23,149 +19,45 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-
 
       - name: Install Android SDK 35
         shell: bash
         run: |
           sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
-
       - name: Setup Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-
-      - name: Find My Life V1.3 ZIP
+      - name: Build Permanent Signed Release APK
         shell: bash
         run: |
-          echo "Searching for My Life V1.3..."
+          gradle clean assembleRelease --stacktrace
 
-          ZIP_PATH=$(find . -maxdepth 2 -type f \
-            -name "*MyLife*V1.3*.zip" \
-            | head -n 1)
-
-          if [ -z "$ZIP_PATH" ]; then
-            echo "ERROR: My Life V1.3 ZIP not found"
-            echo ""
-            echo "Repository files:"
-            find . -maxdepth 2 -type f
-            exit 1
-          fi
-
-          echo "ZIP found:"
-          echo "$ZIP_PATH"
-
-          echo "ZIP_PATH=$ZIP_PATH" >> "$GITHUB_ENV"
-
-
-      - name: Extract My Life Project
+      - name: Verify Signed APK
         shell: bash
         run: |
-          echo "Extracting My Life..."
-
-          rm -rf mylife_build
-          mkdir -p mylife_build
-
-          unzip -q "$ZIP_PATH" -d mylife_build
-
-          SETTINGS_PATH=$(find mylife_build \
-            -type f \
-            -name "settings.gradle" \
-            | head -n 1)
-
-          if [ -z "$SETTINGS_PATH" ]; then
-            echo "ERROR: settings.gradle not found"
-            echo ""
-            echo "Extracted files:"
-            find mylife_build -maxdepth 5 -type f
-            exit 1
-          fi
-
-          PROJECT_DIR=$(dirname "$SETTINGS_PATH")
-
-          echo "Android Project:"
-          echo "$PROJECT_DIR"
-
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-
-      - name: Verify My Life Project
-        shell: bash
-        run: |
-          echo "Checking project..."
-
-          test -f "$PROJECT_DIR/settings.gradle"
-          test -f "$PROJECT_DIR/build.gradle"
-          test -f "$PROJECT_DIR/app/build.gradle"
-          test -f "$PROJECT_DIR/app/src/main/AndroidManifest.xml"
-          test -f "$PROJECT_DIR/app/src/main/assets/index.html"
-          test -f "$PROJECT_DIR/app/src/main/assets/profile.png"
-
-          echo ""
-          echo "My Life V1.3 project verified successfully."
-
-
-      - name: Show Version
-        shell: bash
-        run: |
-          echo "App build.gradle:"
-          cat "$PROJECT_DIR/app/build.gradle"
-
-
-      - name: Build My Life APK
-        shell: bash
-        run: |
-          cd "$PROJECT_DIR"
-
-          echo "Building My Life V1.3..."
-
-          gradle clean assembleDebug --stacktrace
-
-
-      - name: Find Generated APK
-        shell: bash
-        run: |
-          APK_PATH=$(find "$PROJECT_DIR/app/build/outputs/apk/debug" \
-            -type f \
-            -name "*.apk" \
-            | head -n 1)
-
-          if [ -z "$APK_PATH" ]; then
-            echo "ERROR: APK was not generated"
-            echo ""
-            echo "Build files:"
-            find "$PROJECT_DIR/app/build" -type f || true
-            exit 1
-          fi
-
-          echo "APK generated:"
-          echo "$APK_PATH"
-
-          echo "APK_PATH=$APK_PATH" >> "$GITHUB_ENV"
-
+          test -f app/build/outputs/apk/release/app-release.apk
+          apksigner verify --verbose \
+            app/build/outputs/apk/release/app-release.apk
 
       - name: Prepare Final APK
         shell: bash
         run: |
           mkdir -p apk-output
 
-          cp "$APK_PATH" \
-            "apk-output/My-Life-V1.3-Quran-Adhkar.apk"
+          cp app/build/outputs/apk/release/app-release.apk \
+             apk-output/My-Life-V1.4-PERMANENT-SIGNED.apk
 
-          echo ""
-          echo "Final APK:"
           ls -lh apk-output
 
-
-      - name: Upload My Life APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: My-Life-V1.3-Quran-Adhkar
-          path: apk-output/My-Life-V1.3-Quran-Adhkar.apk
+          name: My-Life-V1.4-PERMANENT-SIGNED
+          path: apk-output/My-Life-V1.4-PERMANENT-SIGNED.apk
           if-no-files-found: error
           retention-days: 30
