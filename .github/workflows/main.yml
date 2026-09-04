@@ -1,225 +1,71 @@
-name: Build Kayan Vet V2.4 Safe Storage
+name: Build Kayan Vet V3.4 Safe Signed
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 permissions:
   contents: read
 
 jobs:
   build:
-    name: Build Kayan Vet V2.4
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: '17'
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK 35
+      - name: Install Android SDK 36
         shell: bash
         run: |
           yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0"
 
-      - name: Setup Gradle 8.11.1
+      - name: Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.11.1"
+          gradle-version: '8.11.1'
 
-      - name: Find Kayan Vet Project
+      - name: Fix wrapper
         shell: bash
         run: |
-          ZIP_PATH=$(find . -maxdepth 5 -type f \
-            \( \
-              -iname "*Kayan*Vet*.zip" \
-              -o -iname "*KayanVet*.zip" \
-              -o -iname "*KAYAN*.zip" \
-            \) \
-            | head -n 1)
+          sed -i 's/\r$//' gradlew || true
+          chmod +x gradlew || true
+          sed -i 's#distributionUrl=.*#distributionUrl=https\\://services.gradle.org/distributions/gradle-8.11.1-bin.zip#' gradle/wrapper/gradle-wrapper.properties
 
-          if [ -z "$ZIP_PATH" ]; then
-            echo "ERROR: Kayan Vet ZIP not found."
-            find . -maxdepth 6 -type f | sort
-            exit 1
-          fi
-
-          echo "ZIP_PATH=$ZIP_PATH" >> "$GITHUB_ENV"
-          echo "ZIP found: $ZIP_PATH"
-
-      - name: Extract Kayan Vet Project
+      - name: Verify permanent signing key
         shell: bash
         run: |
-          rm -rf "$GITHUB_WORKSPACE/kayan_build"
-          mkdir -p "$GITHUB_WORKSPACE/kayan_build"
+          test -f app/kayan-vet-release.keystore
+          grep -q "signingConfig signingConfigs.release" app/build.gradle
+          grep -q "applicationId 'com.kayan.vethospital'" app/build.gradle
+          grep -q "versionCode 28" app/build.gradle
+          echo "Permanent Kayan signing configuration verified."
 
-          unzip -q "$ZIP_PATH" -d "$GITHUB_WORKSPACE/kayan_build"
-
-          echo "Project extracted successfully."
-
-      - name: Find Android Project
+      - name: Build signed release APK
         shell: bash
         run: |
-          SETTINGS_PATH=$(find "$GITHUB_WORKSPACE/kayan_build" \
-            -type f \
-            \( \
-              -name "settings.gradle" \
-              -o -name "settings.gradle.kts" \
-            \) \
-            | head -n 1)
+          gradle clean assembleRelease --stacktrace --no-daemon
 
-          if [ -z "$SETTINGS_PATH" ]; then
-            echo "ERROR: settings.gradle not found."
-
-            find "$GITHUB_WORKSPACE/kayan_build" \
-              -maxdepth 8 \
-              -type f \
-              | sort
-
-            exit 1
-          fi
-
-          PROJECT_DIR=$(dirname "$SETTINGS_PATH")
-
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Android project found:"
-          echo "$PROJECT_DIR"
-
-      - name: Fix Gradle Wrapper
+      - name: Verify signed APK exists
         shell: bash
         run: |
-          cd "$PROJECT_DIR"
+          APK="app/build/outputs/apk/release/app-release.apk"
 
-          if [ -f "gradlew" ]; then
-            echo "Fixing gradlew line endings..."
+          if [ ! -f "$APK" ]; then
+            echo "ERROR: signed app-release.apk not found"
 
-            sed -i 's/\r$//' gradlew
-
-            chmod +x gradlew || true
-
-            echo "gradlew repaired."
-          fi
-
-          WRAPPER_FILE="$PROJECT_DIR/gradle/wrapper/gradle-wrapper.properties"
-
-          if [ -f "$WRAPPER_FILE" ]; then
-            sed -i \
-              's#distributionUrl=.*#distributionUrl=https\\://services.gradle.org/distributions/gradle-8.11.1-bin.zip#' \
-              "$WRAPPER_FILE"
-
-            echo "Gradle Wrapper set to 8.11.1"
-
-            cat "$WRAPPER_FILE"
-          fi
-
-      - name: Verify Android Project
-        shell: bash
-        run: |
-          test -d "$PROJECT_DIR/app"
-          test -f "$PROJECT_DIR/app/build.gradle"
-          test -f "$PROJECT_DIR/app/src/main/AndroidManifest.xml"
-
-          echo "Android project structure OK."
-
-      - name: Show Application Information
-        shell: bash
-        run: |
-          echo "======================================"
-          echo "APPLICATION INFORMATION"
-          echo "======================================"
-
-          grep -E \
-            "applicationId|versionCode|versionName" \
-            "$PROJECT_DIR/app/build.gradle" \
-            || true
-
-      - name: Verify Signing Key
-        shell: bash
-        run: |
-          KEYSTORE_PATH=$(find "$PROJECT_DIR" \
-            -type f \
-            \( \
-              -iname "*.jks" \
-              -o -iname "*.keystore" \
-            \) \
-            | head -n 1)
-
-          if [ -n "$KEYSTORE_PATH" ]; then
-            echo "Signing key found:"
-            echo "$KEYSTORE_PATH"
-
-            echo "KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
-          else
-            echo "WARNING: Signing key not found."
-          fi
-
-      - name: Build Release APK
-        shell: bash
-        run: |
-          echo "======================================"
-          echo "BUILDING KAYAN VET"
-          echo "GRADLE 8.11.1"
-          echo "======================================"
-
-          cd "$PROJECT_DIR"
-
-          if [ -f "gradlew" ]; then
-
-            echo "Using repaired Gradle Wrapper..."
-
-            sed -i 's/\r$//' gradlew
-            chmod +x gradlew || true
-
-            bash gradlew \
-              clean \
-              assembleRelease \
-              --stacktrace \
-              --no-daemon
-
-          else
-
-            echo "Gradle Wrapper missing."
-            echo "Using installed Gradle 8.11.1..."
-
-            gradle \
-              clean \
-              assembleRelease \
-              --stacktrace \
-              --no-daemon
-          fi
-
-      - name: Find Release APK
-        shell: bash
-        run: |
-          APK_PATH=$(find "$PROJECT_DIR/app/build/outputs/apk" \
-            -type f \
-            -name "*.apk" \
-            | grep -v "unsigned" \
-            | head -n 1)
-
-          if [ -z "$APK_PATH" ]; then
-            APK_PATH=$(find "$PROJECT_DIR/app/build/outputs/apk" \
-              -type f \
-              -name "*.apk" \
-              | head -n 1)
-          fi
-
-          if [ -z "$APK_PATH" ]; then
-
-            echo "ERROR: APK not found."
-
-            find "$PROJECT_DIR/app/build/outputs" \
+            find app/build/outputs \
               -type f \
               2>/dev/null \
               | sort \
@@ -228,46 +74,25 @@ jobs:
             exit 1
           fi
 
-          echo "APK_PATH=$APK_PATH" >> "$GITHUB_ENV"
+          if find app/build/outputs/apk/release \
+            -name '*unsigned*.apk' \
+            | grep -q .; then
 
-          echo "APK found:"
-          echo "$APK_PATH"
+            echo "Unsigned APK may also exist, but it will NOT be uploaded."
+          fi
 
-          ls -lh "$APK_PATH"
+          mkdir -p apk-output
 
-      - name: Prepare Final APK
-        shell: bash
-        run: |
-          rm -rf "$GITHUB_WORKSPACE/apk-output"
-          mkdir -p "$GITHUB_WORKSPACE/apk-output"
+          cp "$APK" \
+            apk-output/Kayan-Vet-Hospital-V3.4.0-SAFE-SIGNED.apk
 
-          FINAL_APK="$GITHUB_WORKSPACE/apk-output/Kayan-Vet-V2.4-SAFE-STORAGE-SEARCH.apk"
+          ls -lh \
+            apk-output/Kayan-Vet-Hospital-V3.4.0-SAFE-SIGNED.apk
 
-          cp "$APK_PATH" "$FINAL_APK"
-
-          echo "FINAL_APK=$FINAL_APK" >> "$GITHUB_ENV"
-
-          echo "Final APK:"
-          ls -lh "$FINAL_APK"
-
-      - name: Final Build Information
-        shell: bash
-        run: |
-          echo "======================================"
-          echo "KAYAN VET V2.4 BUILD SUCCESSFUL"
-          echo "======================================"
-          echo ""
-          echo "Gradle: 8.11.1"
-          echo "Android SDK: 35"
-          echo "Safe Storage: Enabled"
-          echo "Medicine Search: Enabled"
-          echo ""
-          echo "APK READY"
-
-      - name: Upload Kayan Vet APK
+      - name: Upload signed APK only
         uses: actions/upload-artifact@v4
         with:
-          name: Kayan-Vet-V2.4-SAFE-STORAGE-SEARCH
-          path: apk-output/Kayan-Vet-V2.4-SAFE-STORAGE-SEARCH.apk
+          name: Kayan-Vet-Hospital-V3.4.0-SAFE-SIGNED
+          path: apk-output/Kayan-Vet-Hospital-V3.4.0-SAFE-SIGNED.apk
           if-no-files-found: error
           retention-days: 30
