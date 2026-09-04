@@ -15,7 +15,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout Repository
         uses: actions/checkout@v4
 
@@ -42,8 +41,6 @@ jobs:
       - name: Find Kayan Vet Project
         shell: bash
         run: |
-          echo "Searching for Kayan Vet ZIP..."
-
           ZIP_PATH=$(find . -maxdepth 5 -type f \
             \( \
               -iname "*Kayan*Vet*.zip" \
@@ -69,7 +66,7 @@ jobs:
 
           unzip -q "$ZIP_PATH" -d "$GITHUB_WORKSPACE/kayan_build"
 
-          echo "Project extracted."
+          echo "Project extracted successfully."
 
       - name: Find Android Project
         shell: bash
@@ -84,18 +81,36 @@ jobs:
 
           if [ -z "$SETTINGS_PATH" ]; then
             echo "ERROR: settings.gradle not found."
-            find "$GITHUB_WORKSPACE/kayan_build" -maxdepth 8 -type f | sort
+
+            find "$GITHUB_WORKSPACE/kayan_build" \
+              -maxdepth 8 \
+              -type f \
+              | sort
+
             exit 1
           fi
 
           PROJECT_DIR=$(dirname "$SETTINGS_PATH")
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Android project found: $PROJECT_DIR"
+          echo "Android project found:"
+          echo "$PROJECT_DIR"
 
-      - name: Force Gradle Wrapper 8.11.1
+      - name: Fix Gradle Wrapper
         shell: bash
         run: |
+          cd "$PROJECT_DIR"
+
+          if [ -f "gradlew" ]; then
+            echo "Fixing gradlew line endings..."
+
+            sed -i 's/\r$//' gradlew
+
+            chmod +x gradlew || true
+
+            echo "gradlew repaired."
+          fi
+
           WRAPPER_FILE="$PROJECT_DIR/gradle/wrapper/gradle-wrapper.properties"
 
           if [ -f "$WRAPPER_FILE" ]; then
@@ -103,11 +118,9 @@ jobs:
               's#distributionUrl=.*#distributionUrl=https\\://services.gradle.org/distributions/gradle-8.11.1-bin.zip#' \
               "$WRAPPER_FILE"
 
-            echo "Gradle Wrapper changed to 8.11.1"
+            echo "Gradle Wrapper set to 8.11.1"
+
             cat "$WRAPPER_FILE"
-          else
-            echo "No gradle-wrapper.properties found."
-            echo "Installed Gradle 8.11.1 will be used."
           fi
 
       - name: Verify Android Project
@@ -145,6 +158,7 @@ jobs:
           if [ -n "$KEYSTORE_PATH" ]; then
             echo "Signing key found:"
             echo "$KEYSTORE_PATH"
+
             echo "KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
           else
             echo "WARNING: Signing key not found."
@@ -160,15 +174,24 @@ jobs:
 
           cd "$PROJECT_DIR"
 
-          if [ -f "./gradlew" ]; then
-            chmod +x ./gradlew || true
+          if [ -f "gradlew" ]; then
 
-            ./gradlew \
+            echo "Using repaired Gradle Wrapper..."
+
+            sed -i 's/\r$//' gradlew
+            chmod +x gradlew || true
+
+            bash gradlew \
               clean \
               assembleRelease \
               --stacktrace \
               --no-daemon
+
           else
+
+            echo "Gradle Wrapper missing."
+            echo "Using installed Gradle 8.11.1..."
+
             gradle \
               clean \
               assembleRelease \
@@ -193,12 +216,15 @@ jobs:
           fi
 
           if [ -z "$APK_PATH" ]; then
+
             echo "ERROR: APK not found."
+
             find "$PROJECT_DIR/app/build/outputs" \
               -type f \
               2>/dev/null \
               | sort \
               || true
+
             exit 1
           fi
 
@@ -206,6 +232,7 @@ jobs:
 
           echo "APK found:"
           echo "$APK_PATH"
+
           ls -lh "$APK_PATH"
 
       - name: Prepare Final APK
@@ -220,17 +247,20 @@ jobs:
 
           echo "FINAL_APK=$FINAL_APK" >> "$GITHUB_ENV"
 
+          echo "Final APK:"
           ls -lh "$FINAL_APK"
 
       - name: Final Build Information
         shell: bash
         run: |
           echo "======================================"
-          echo "KAYAN VET BUILD SUCCESSFUL"
+          echo "KAYAN VET V2.4 BUILD SUCCESSFUL"
           echo "======================================"
           echo ""
           echo "Gradle: 8.11.1"
           echo "Android SDK: 35"
+          echo "Safe Storage: Enabled"
+          echo "Medicine Search: Enabled"
           echo ""
           echo "APK READY"
 
