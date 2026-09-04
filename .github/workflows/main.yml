@@ -16,63 +16,35 @@ jobs:
 
     steps:
 
-      # ==========================================
-      # 1. DOWNLOAD REPOSITORY
-      # ==========================================
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-
-      # ==========================================
-      # 2. JAVA 17
-      # ==========================================
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-
-      # ==========================================
-      # 3. ANDROID SDK
-      # ==========================================
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-
-      # ==========================================
-      # 4. INSTALL ANDROID SDK 35
-      # ==========================================
       - name: Install Android SDK 35
         shell: bash
         run: |
           yes | sdkmanager --licenses > /dev/null || true
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-
-      # ==========================================
-      # 5. GRADLE
-      # ==========================================
-      - name: Setup Gradle 8.9
+      - name: Setup Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.9"
+          gradle-version: "8.11.1"
 
-
-      # ==========================================
-      # 6. FIND PROJECT ZIP
-      # ==========================================
       - name: Find Kayan Vet Project
         shell: bash
         run: |
+          echo "Searching for Kayan Vet ZIP..."
 
-          echo "======================================"
-          echo "SEARCHING FOR KAYAN VET PROJECT"
-          echo "======================================"
-
-          ZIP_PATH=$(find . \
-            -maxdepth 5 \
-            -type f \
+          ZIP_PATH=$(find . -maxdepth 5 -type f \
             \( \
               -iname "*Kayan*Vet*.zip" \
               -o -iname "*KayanVet*.zip" \
@@ -81,50 +53,27 @@ jobs:
             | head -n 1)
 
           if [ -z "$ZIP_PATH" ]; then
-
-            echo ""
             echo "ERROR: Kayan Vet ZIP not found."
-            echo ""
-            echo "Repository files:"
             find . -maxdepth 6 -type f | sort
-
             exit 1
-
           fi
 
-          echo ""
-          echo "ZIP FOUND:"
-          echo "$ZIP_PATH"
-
           echo "ZIP_PATH=$ZIP_PATH" >> "$GITHUB_ENV"
+          echo "ZIP found: $ZIP_PATH"
 
-
-      # ==========================================
-      # 7. EXTRACT PROJECT
-      # ==========================================
       - name: Extract Kayan Vet Project
         shell: bash
         run: |
-
           rm -rf "$GITHUB_WORKSPACE/kayan_build"
-
           mkdir -p "$GITHUB_WORKSPACE/kayan_build"
 
-          unzip -q \
-            "$ZIP_PATH" \
-            -d "$GITHUB_WORKSPACE/kayan_build"
+          unzip -q "$ZIP_PATH" -d "$GITHUB_WORKSPACE/kayan_build"
 
-          echo ""
-          echo "Project extracted successfully."
+          echo "Project extracted."
 
-
-      # ==========================================
-      # 8. FIND ANDROID PROJECT
-      # ==========================================
       - name: Find Android Project
         shell: bash
         run: |
-
           SETTINGS_PATH=$(find "$GITHUB_WORKSPACE/kayan_build" \
             -type f \
             \( \
@@ -134,64 +83,45 @@ jobs:
             | head -n 1)
 
           if [ -z "$SETTINGS_PATH" ]; then
-
-            echo ""
             echo "ERROR: settings.gradle not found."
-            echo ""
-            echo "Extracted files:"
-
-            find "$GITHUB_WORKSPACE/kayan_build" \
-              -maxdepth 8 \
-              -type f \
-              | sort
-
+            find "$GITHUB_WORKSPACE/kayan_build" -maxdepth 8 -type f | sort
             exit 1
-
           fi
 
           PROJECT_DIR=$(dirname "$SETTINGS_PATH")
 
-          echo ""
-          echo "ANDROID PROJECT FOUND:"
-          echo "$PROJECT_DIR"
-
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Android project found: $PROJECT_DIR"
 
+      - name: Force Gradle Wrapper 8.11.1
+        shell: bash
+        run: |
+          WRAPPER_FILE="$PROJECT_DIR/gradle/wrapper/gradle-wrapper.properties"
 
-      # ==========================================
-      # 9. VERIFY PROJECT
-      # ==========================================
+          if [ -f "$WRAPPER_FILE" ]; then
+            sed -i \
+              's#distributionUrl=.*#distributionUrl=https\\://services.gradle.org/distributions/gradle-8.11.1-bin.zip#' \
+              "$WRAPPER_FILE"
+
+            echo "Gradle Wrapper changed to 8.11.1"
+            cat "$WRAPPER_FILE"
+          else
+            echo "No gradle-wrapper.properties found."
+            echo "Installed Gradle 8.11.1 will be used."
+          fi
+
       - name: Verify Android Project
         shell: bash
         run: |
+          test -d "$PROJECT_DIR/app"
+          test -f "$PROJECT_DIR/app/build.gradle"
+          test -f "$PROJECT_DIR/app/src/main/AndroidManifest.xml"
 
-          if [ ! -d "$PROJECT_DIR/app" ]; then
-            echo "ERROR: app folder missing."
-            exit 1
-          fi
-
-          if [ ! -f "$PROJECT_DIR/app/build.gradle" ]; then
-            echo "ERROR: app/build.gradle missing."
-            exit 1
-          fi
-
-          if [ ! -f "$PROJECT_DIR/app/src/main/AndroidManifest.xml" ]; then
-            echo "ERROR: AndroidManifest.xml missing."
-            exit 1
-          fi
-
-          echo ""
           echo "Android project structure OK."
 
-
-      # ==========================================
-      # 10. SHOW PACKAGE / VERSION
-      # ==========================================
       - name: Show Application Information
         shell: bash
         run: |
-
-          echo ""
           echo "======================================"
           echo "APPLICATION INFORMATION"
           echo "======================================"
@@ -201,14 +131,9 @@ jobs:
             "$PROJECT_DIR/app/build.gradle" \
             || true
 
-
-      # ==========================================
-      # 11. VERIFY SIGNING KEY
-      # ==========================================
       - name: Verify Signing Key
         shell: bash
         run: |
-
           KEYSTORE_PATH=$(find "$PROJECT_DIR" \
             -type f \
             \( \
@@ -217,75 +142,43 @@ jobs:
             \) \
             | head -n 1)
 
-          if [ -z "$KEYSTORE_PATH" ]; then
-
-            echo ""
-            echo "WARNING:"
-            echo "Permanent signing key was not found."
-            echo ""
-            echo "Gradle will attempt to build according"
-            echo "to the signing configuration in the project."
-
-          else
-
-            echo ""
-            echo "SIGNING KEY FOUND:"
+          if [ -n "$KEYSTORE_PATH" ]; then
+            echo "Signing key found:"
             echo "$KEYSTORE_PATH"
-
             echo "KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
-
+          else
+            echo "WARNING: Signing key not found."
           fi
 
-
-      # ==========================================
-      # 12. BUILD RELEASE APK
-      # ==========================================
       - name: Build Release APK
         shell: bash
         run: |
-
-          echo ""
           echo "======================================"
           echo "BUILDING KAYAN VET"
+          echo "GRADLE 8.11.1"
           echo "======================================"
 
           cd "$PROJECT_DIR"
 
           if [ -f "./gradlew" ]; then
-
-            echo "Using Gradle Wrapper"
-
             chmod +x ./gradlew || true
 
-            bash ./gradlew \
+            ./gradlew \
               clean \
               assembleRelease \
               --stacktrace \
               --no-daemon
-
           else
-
-            echo "Using Gradle 8.9"
-
             gradle \
               clean \
               assembleRelease \
               --stacktrace \
               --no-daemon
-
           fi
 
-
-      # ==========================================
-      # 13. FIND APK
-      # ==========================================
       - name: Find Release APK
         shell: bash
         run: |
-
-          echo ""
-          echo "Searching for APK..."
-
           APK_PATH=$(find "$PROJECT_DIR/app/build/outputs/apk" \
             -type f \
             -name "*.apk" \
@@ -293,104 +186,54 @@ jobs:
             | head -n 1)
 
           if [ -z "$APK_PATH" ]; then
-
             APK_PATH=$(find "$PROJECT_DIR/app/build/outputs/apk" \
               -type f \
               -name "*.apk" \
               | head -n 1)
-
           fi
 
           if [ -z "$APK_PATH" ]; then
-
-            echo ""
-            echo "ERROR: APK NOT FOUND."
-            echo ""
-
+            echo "ERROR: APK not found."
             find "$PROJECT_DIR/app/build/outputs" \
               -type f \
               2>/dev/null \
               | sort \
               || true
-
             exit 1
-
           fi
-
-          echo ""
-          echo "APK FOUND:"
-          echo "$APK_PATH"
-
-          ls -lh "$APK_PATH"
 
           echo "APK_PATH=$APK_PATH" >> "$GITHUB_ENV"
 
+          echo "APK found:"
+          echo "$APK_PATH"
+          ls -lh "$APK_PATH"
 
-      # ==========================================
-      # 14. PREPARE FINAL APK
-      # ==========================================
       - name: Prepare Final APK
         shell: bash
         run: |
-
           rm -rf "$GITHUB_WORKSPACE/apk-output"
-
           mkdir -p "$GITHUB_WORKSPACE/apk-output"
 
           FINAL_APK="$GITHUB_WORKSPACE/apk-output/Kayan-Vet-V2.4-SAFE-STORAGE-SEARCH.apk"
 
-          cp \
-            "$APK_PATH" \
-            "$FINAL_APK"
-
-          echo ""
-          echo "FINAL APK:"
-          echo "$FINAL_APK"
-
-          ls -lh "$FINAL_APK"
+          cp "$APK_PATH" "$FINAL_APK"
 
           echo "FINAL_APK=$FINAL_APK" >> "$GITHUB_ENV"
 
+          ls -lh "$FINAL_APK"
 
-      # ==========================================
-      # 15. FINAL CHECK
-      # ==========================================
-      - name: Final Verification
+      - name: Final Build Information
         shell: bash
         run: |
-
-          if [ ! -f "$FINAL_APK" ]; then
-            echo "ERROR: Final APK missing."
-            exit 1
-          fi
-
-          echo ""
           echo "======================================"
           echo "KAYAN VET BUILD SUCCESSFUL"
           echo "======================================"
           echo ""
-          echo "SAFE STORAGE VERSION"
-          echo ""
-          echo "- Medicine management"
-          echo "- Feed management"
-          echo "- Horses"
-          echo "- Stables"
-          echo "- Medical cases"
-          echo "- Reports"
-          echo "- Backup / Restore"
-          echo "- Safer local storage"
-          echo "- Emergency recovery storage"
-          echo "- Medicine search"
-          echo "- Search during medicine issue"
-          echo "- Search during medicine addition"
-          echo "- Feed search"
+          echo "Gradle: 8.11.1"
+          echo "Android SDK: 35"
           echo ""
           echo "APK READY"
 
-
-      # ==========================================
-      # 16. UPLOAD APK
-      # ==========================================
       - name: Upload Kayan Vet APK
         uses: actions/upload-artifact@v4
         with:
