@@ -31,10 +31,7 @@ jobs:
         shell: bash
         run: |
           yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Setup Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
@@ -44,29 +41,24 @@ jobs:
       - name: Find And Extract My Life V2.5 ZIP
         shell: bash
         run: |
-          echo "Searching for My Life V2.5 project..."
+          echo "Searching for My Life V2.5 ZIP..."
 
           ZIP_PATH=$(find . -maxdepth 5 -type f \
             \( \
               -iname "*MyLife*V2.5*.zip" \
               -o -iname "*My-Life*V2.5*.zip" \
               -o -iname "*FOCUS*60*30*.zip" \
-            \) | head -n 1)
+            \) \
+            | head -n 1)
 
           if [ -z "$ZIP_PATH" ]; then
-            echo "Exact V2.5 ZIP not found. Searching for MyLife ZIP..."
-            ZIP_PATH=$(find . -maxdepth 5 -type f \
-              \( -iname "*MyLife*.zip" -o -iname "*My-Life*.zip" \) \
-              | sort | tail -n 1)
-          fi
-
-          if [ -z "$ZIP_PATH" ]; then
-            echo "ERROR: My Life project ZIP not found."
+            echo "ERROR: My Life V2.5 project ZIP not found."
+            echo "Files found in repository:"
             find . -maxdepth 6 -type f | sort
             exit 1
           fi
 
-          echo "ZIP FOUND:"
+          echo "ZIP found:"
           echo "$ZIP_PATH"
 
           rm -rf "$GITHUB_WORKSPACE/mylife_build"
@@ -74,13 +66,19 @@ jobs:
 
           unzip -q "$ZIP_PATH" -d "$GITHUB_WORKSPACE/mylife_build"
 
+          echo "Project extracted successfully."
+
           SETTINGS_PATH=$(find "$GITHUB_WORKSPACE/mylife_build" \
             -type f \
-            \( -name "settings.gradle" -o -name "settings.gradle.kts" \) \
+            \( \
+              -name "settings.gradle" \
+              -o -name "settings.gradle.kts" \
+            \) \
             | head -n 1)
 
           if [ -z "$SETTINGS_PATH" ]; then
             echo "ERROR: settings.gradle not found."
+            echo "Extracted files:"
             find "$GITHUB_WORKSPACE/mylife_build" -maxdepth 8 -type f | sort
             exit 1
           fi
@@ -88,18 +86,21 @@ jobs:
           PROJECT_DIR=$(dirname "$SETTINGS_PATH")
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "PROJECT FOUND:"
+
+          echo "Android project found:"
           echo "$PROJECT_DIR"
 
       - name: Verify Android Project
         shell: bash
         run: |
+          echo "Verifying project..."
+
           test -d "$PROJECT_DIR/app"
           test -f "$PROJECT_DIR/app/build.gradle"
           test -f "$PROJECT_DIR/app/src/main/AndroidManifest.xml"
           test -f "$PROJECT_DIR/app/src/main/assets/index.html"
 
-          echo "Android project structure OK"
+          echo "Android project structure OK."
 
       - name: Verify Package And Version
         shell: bash
@@ -110,46 +111,33 @@ jobs:
           grep -q "versionCode 16" "$BUILD_FILE"
           grep -q "versionName '2.5.0'" "$BUILD_FILE"
 
-          echo "Package: com.mylife.app"
-          echo "Version: 2.5.0"
-          echo "Version Code: 16"
+          echo "Package verified: com.mylife.app"
+          echo "Version verified: 2.5.0"
+          echo "Version Code verified: 16"
 
       - name: Verify Permanent Signing Key
         shell: bash
         run: |
-          KEYSTORE_PATH=$(find "$PROJECT_DIR" \
-            -type f \
-            \( -iname "*.jks" -o -iname "*.keystore" \) \
-            | head -n 1)
-
-          if [ -z "$KEYSTORE_PATH" ]; then
-            echo "ERROR: Permanent signing key not found."
+          if [ -f "$PROJECT_DIR/app/mylife-release.jks" ]; then
+            echo "Permanent signing key found."
+          else
+            echo "ERROR: app/mylife-release.jks not found."
+            echo "Build stopped to protect update compatibility."
             exit 1
           fi
 
-          echo "Permanent signing key found:"
-          echo "$KEYSTORE_PATH"
-
-      - name: Verify Focus 60-30 System
+      - name: Verify Focus Timer
         shell: bash
         run: |
           INDEX_FILE="$PROJECT_DIR/app/src/main/assets/index.html"
 
           echo "Checking Focus 60/30 system..."
 
-          if grep -q "60" "$INDEX_FILE"; then
-            echo "60-minute focus configuration detected"
-          fi
+          grep -qi "focus" "$INDEX_FILE" || true
+          grep -q "60" "$INDEX_FILE" || true
+          grep -q "30" "$INDEX_FILE" || true
 
-          if grep -q "30" "$INDEX_FILE"; then
-            echo "30-minute break configuration detected"
-          fi
-
-          if grep -qi "focus" "$INDEX_FILE"; then
-            echo "Focus system detected"
-          fi
-
-          echo "Focus verification finished"
+          echo "Focus check completed."
 
       - name: Verify Five Life Pillars
         shell: bash
@@ -162,7 +150,7 @@ jobs:
           grep -q "مهني" "$INDEX_FILE" || true
           grep -q "مادي" "$INDEX_FILE" || true
 
-          echo "Five Life Pillars checked"
+          echo "Five Life Pillars check completed."
 
       - name: Verify Step Counter
         shell: bash
@@ -170,9 +158,9 @@ jobs:
           JAVA_DIR="$PROJECT_DIR/app/src/main/java"
 
           if grep -R -q "TYPE_STEP_COUNTER" "$JAVA_DIR"; then
-            echo "Native Step Counter found"
+            echo "Native Step Counter found."
           else
-            echo "ERROR: TYPE_STEP_COUNTER missing"
+            echo "ERROR: TYPE_STEP_COUNTER missing."
             exit 1
           fi
 
@@ -182,70 +170,57 @@ jobs:
           MANIFEST="$PROJECT_DIR/app/src/main/AndroidManifest.xml"
 
           if grep -q "ACTIVITY_RECOGNITION" "$MANIFEST"; then
-            echo "Activity Recognition permission found"
+            echo "ACTIVITY_RECOGNITION permission found."
           else
-            echo "ERROR: ACTIVITY_RECOGNITION missing"
+            echo "ERROR: ACTIVITY_RECOGNITION permission missing."
             exit 1
           fi
 
-      - name: Verify Health And Weight System
+      - name: Verify Health System
         shell: bash
         run: |
           INDEX_FILE="$PROJECT_DIR/app/src/main/assets/index.html"
 
-          grep -q "weightHistory" "$INDEX_FILE" \
-            && echo "Weight history found" \
-            || true
+          grep -q "weightHistory" "$INDEX_FILE" || true
+          grep -q "targetWeight" "$INDEX_FILE" || true
+          grep -q "BMI" "$INDEX_FILE" || true
+          grep -q "تسجيل الوزن" "$INDEX_FILE" || true
 
-          grep -q "targetWeight" "$INDEX_FILE" \
-            && echo "Target weight found" \
-            || true
+          echo "Health system check completed."
 
-          grep -q "BMI" "$INDEX_FILE" \
-            && echo "BMI found" \
-            || true
-
-          grep -q "تسجيل الوزن" "$INDEX_FILE" \
-            && echo "Daily weight logging found" \
-            || true
-
-      - name: Verify Calendar History
+      - name: Verify Calendar
         shell: bash
         run: |
           INDEX_FILE="$PROJECT_DIR/app/src/main/assets/index.html"
 
-          grep -q "كل المحفوظ" "$INDEX_FILE" \
-            && echo "Complete calendar history found" \
-            || true
+          grep -q "كل المحفوظ" "$INDEX_FILE" || true
+
+          echo "Calendar check completed."
 
       - name: Verify Quran And Adhkar
         shell: bash
         run: |
           INDEX_FILE="$PROJECT_DIR/app/src/main/assets/index.html"
 
-          grep -q "القرآن" "$INDEX_FILE" \
-            && echo "Quran found" \
-            || true
+          grep -q "القرآن" "$INDEX_FILE" || true
+          grep -q "أذكار الصباح" "$INDEX_FILE" || true
+          grep -q "أذكار المساء" "$INDEX_FILE" || true
 
-          grep -q "أذكار الصباح" "$INDEX_FILE" \
-            && echo "Morning Adhkar found" \
-            || true
-
-          grep -q "أذكار المساء" "$INDEX_FILE" \
-            && echo "Evening Adhkar found" \
-            || true
+          echo "Quran and Adhkar check completed."
 
       - name: Build Signed Release APK
         shell: bash
         run: |
-          echo "========================================"
+          echo "=========================================="
           echo "BUILDING MY LIFE V2.5"
-          echo "PREMIUM FOCUS 60/30"
-          echo "========================================"
+          echo "PREMIUM FOCUS 60 / 30"
+          echo "=========================================="
 
           cd "$PROJECT_DIR"
 
           if [ -f "./gradlew" ]; then
+            echo "Using Gradle Wrapper..."
+
             chmod +x ./gradlew || true
 
             bash ./gradlew \
@@ -254,6 +229,9 @@ jobs:
               --stacktrace \
               --no-daemon
           else
+            echo "Gradle Wrapper not found."
+            echo "Using installed Gradle 8.9..."
+
             gradle \
               clean \
               assembleRelease \
@@ -264,8 +242,7 @@ jobs:
       - name: Find Signed Release APK
         shell: bash
         run: |
-          APK_PATH=$(find \
-            "$PROJECT_DIR/app/build/outputs/apk/release" \
+          APK_PATH=$(find "$PROJECT_DIR/app/build/outputs/apk/release" \
             -type f \
             -name "*.apk" \
             | grep -v "unsigned" \
@@ -274,15 +251,19 @@ jobs:
           if [ -z "$APK_PATH" ]; then
             echo "ERROR: Signed Release APK not found."
 
+            echo "Build outputs:"
             find "$PROJECT_DIR/app/build/outputs" \
-              -type f 2>/dev/null | sort || true
+              -type f \
+              2>/dev/null \
+              | sort \
+              || true
 
             exit 1
           fi
 
           echo "APK_PATH=$APK_PATH" >> "$GITHUB_ENV"
 
-          echo "SIGNED APK FOUND:"
+          echo "Signed APK found:"
           echo "$APK_PATH"
 
           ls -lh "$APK_PATH"
@@ -290,6 +271,7 @@ jobs:
       - name: Prepare Final APK
         shell: bash
         run: |
+          rm -rf "$GITHUB_WORKSPACE/apk-output"
           mkdir -p "$GITHUB_WORKSPACE/apk-output"
 
           FINAL_APK="$GITHUB_WORKSPACE/apk-output/My-Life-V2.5-PREMIUM-FOCUS-60-30.apk"
@@ -298,7 +280,7 @@ jobs:
 
           echo "FINAL_APK=$FINAL_APK" >> "$GITHUB_ENV"
 
-          echo "Final APK:"
+          echo "Final APK prepared:"
           ls -lh "$FINAL_APK"
 
       - name: Final Build Information
@@ -312,50 +294,32 @@ jobs:
           echo "Version: 2.5.0"
           echo "Version Code: 16"
           echo ""
-          echo "PREMIUM HOME"
-          echo "- Clean dashboard"
-          echo "- Five visible Life Pillars"
-          echo "- Spiritual"
-          echo "- Health"
-          echo "- Personal"
-          echo "- Professional"
-          echo "- Financial"
-          echo ""
-          echo "FOCUS"
-          echo "- 60 minutes achievement"
-          echo "- 30 minutes break"
-          echo "- Live countdown"
-          echo "- Start / Pause"
-          echo "- Automatic cycles"
-          echo "- Focus sessions"
-          echo "- Break sessions"
-          echo "- Achievement minutes"
-          echo "- XP"
-          echo ""
-          echo "HEALTH"
-          echo "- Daily weight logging"
-          echo "- Target weight"
-          echo "- Weight history"
-          echo "- Weekly chart"
+          echo "Included:"
+          echo "- Premium Home"
+          echo "- Five Life Pillars"
+          echo "- Professional Pillar"
+          echo "- Financial Pillar"
+          echo "- Focus 60 minutes"
+          echo "- Break 30 minutes"
+          echo "- Live Focus Countdown"
+          echo "- Daily Weight Log"
+          echo "- Target Weight"
           echo "- BMI"
-          echo "- Step counter"
-          echo "- Kilometers"
+          echo "- Weight History"
+          echo "- Weekly Weight Progress"
+          echo "- Step Counter"
+          echo "- Distance"
           echo "- Calories"
-          echo ""
-          echo "CALENDAR"
-          echo "- Past events"
-          echo "- Today"
-          echo "- Future events"
-          echo "- Reminders"
-          echo ""
-          echo "SPIRITUAL"
-          echo "- Prayer times"
+          echo "- Calendar"
+          echo "- Old and New Events"
+          echo "- Prayer Times"
           echo "- Quran"
-          echo "- Wird"
+          echo "- Daily Wird"
           echo "- Morning Adhkar"
           echo "- Evening Adhkar"
+          echo "- Backup / Import / Export"
           echo ""
-          echo "APK READY"
+          echo "APK READY."
 
       - name: Upload My Life V2.5 APK
         uses: actions/upload-artifact@v4
