@@ -3,18 +3,26 @@ name: Build My Life V1.5 Permanent Signed APK
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   build:
+    name: Build My Life V1.5
     runs-on: ubuntu-latest
 
     steps:
 
+      # =====================================================
+      # 1) Checkout Repository
+      # =====================================================
       - name: Checkout Repository
         uses: actions/checkout@v4
 
 
+      # =====================================================
+      # 2) Java 17
+      # =====================================================
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
@@ -22,62 +30,69 @@ jobs:
           java-version: '17'
 
 
+      # =====================================================
+      # 3) Android SDK
+      # =====================================================
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
 
+      # =====================================================
+      # 4) Install Android Build Tools
+      # =====================================================
       - name: Install Android SDK 35
         shell: bash
         run: |
           sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
 
+          echo "Installed Build Tools:"
+          ls -la "$ANDROID_HOME/build-tools/" || true
+
+
+      # =====================================================
+      # 5) Gradle
+      # =====================================================
       - name: Setup Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
 
-      - name: Find And Extract My Life V1.5
+      # =====================================================
+      # 6) Find V1.5 ZIP
+      # =====================================================
+      - name: Find My Life V1.5 ZIP
         shell: bash
         run: |
+          echo "Searching for My Life V1.5 ZIP..."
+
           ZIP_PATH=$(find . -maxdepth 2 -type f \
             -name "*MyLife*V1.5*.zip" \
             | head -n 1)
 
-          if [ -n "$ZIP_PATH" ]; then
+          if [ -z "$ZIP_PATH" ]; then
 
-            echo "ZIP found:"
-            echo "$ZIP_PATH"
+            echo "Exact V1.5 ZIP not found."
+            echo "Searching for latest My Life ZIP..."
 
-            rm -rf mylife_build
-            mkdir -p mylife_build
-
-            unzip -q "$ZIP_PATH" -d mylife_build
-
-            SETTINGS=$(find mylife_build \
-              -type f \
-              -name settings.gradle \
-              | head -n 1)
-
-          else
-
-            echo "No ZIP found. Searching extracted project..."
-
-            SETTINGS=$(find . \
-              -maxdepth 3 \
-              -type f \
-              -name settings.gradle \
-              | head -n 1)
+            ZIP_PATH=$(find . -maxdepth 2 -type f \
+              -name "*MyLife*.zip" \
+              | sort \
+              | tail -n 1)
 
           fi
 
 
-          if [ -z "$SETTINGS" ]; then
+          if [ -z "$ZIP_PATH" ]; then
 
-            echo "ERROR: settings.gradle not found"
+            echo "ERROR: My Life ZIP not found."
 
+            echo ""
             echo "Repository files:"
+
             find . -maxdepth 3 -type f
 
             exit 1
@@ -85,68 +100,308 @@ jobs:
           fi
 
 
-          PROJECT_DIR=$(dirname "$SETTINGS")
+          echo ""
+          echo "ZIP found:"
+          echo "$ZIP_PATH"
 
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "ZIP_PATH=$ZIP_PATH" >> "$GITHUB_ENV"
 
-          echo "Android Project:"
+
+      # =====================================================
+      # 7) Extract Project
+      # =====================================================
+      - name: Extract My Life V1.5
+        shell: bash
+        run: |
+          rm -rf mylife_build
+
+          mkdir -p mylife_build
+
+          unzip -q "$ZIP_PATH" -d mylife_build
+
+
+          SETTINGS_PATH=$(find mylife_build \
+            -type f \
+            -name "settings.gradle" \
+            | head -n 1)
+
+
+          if [ -z "$SETTINGS_PATH" ]; then
+
+            echo "ERROR: settings.gradle not found."
+
+            echo ""
+            echo "Extracted files:"
+
+            find mylife_build -maxdepth 5 -type f
+
+            exit 1
+
+          fi
+
+
+          PROJECT_DIR=$(dirname "$SETTINGS_PATH")
+
+
+          echo ""
+          echo "Android project found:"
           echo "$PROJECT_DIR"
 
 
-      - name: Verify Permanent Signing Files
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+
+      # =====================================================
+      # 8) Verify Project
+      # =====================================================
+      - name: Verify My Life Project
         shell: bash
         run: |
+          echo "Checking Android project..."
+
+          test -f "$PROJECT_DIR/settings.gradle"
+
+          test -f "$PROJECT_DIR/build.gradle"
+
           test -f "$PROJECT_DIR/app/build.gradle"
 
-          test -f "$PROJECT_DIR/app/mylife-release.jks"
+          test -f "$PROJECT_DIR/app/src/main/AndroidManifest.xml"
+
+          test -f "$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo ""
+          echo "Android project verified."
+
+
+      # =====================================================
+      # 9) Verify Permanent Package
+      # =====================================================
+      - name: Verify Permanent Application ID
+        shell: bash
+        run: |
+          echo "Checking application ID..."
 
           grep -q "applicationId 'com.mylife.app'" \
             "$PROJECT_DIR/app/build.gradle"
 
+          echo "Application ID verified: com.mylife.app"
+
+
+      # =====================================================
+      # 10) Verify V1.5
+      # =====================================================
+      - name: Verify Version 1.5
+        shell: bash
+        run: |
+          echo "Checking V1.5 configuration..."
+
           grep -q "versionName '1.5.0'" \
             "$PROJECT_DIR/app/build.gradle"
 
-          echo "Permanent signing configuration verified."
+          echo "Version 1.5.0 verified."
 
 
+      # =====================================================
+      # 11) Verify Permanent Keystore
+      # =====================================================
+      - name: Verify Permanent Signing Key
+        shell: bash
+        run: |
+          if [ ! -f "$PROJECT_DIR/app/mylife-release.jks" ]; then
+
+            echo "ERROR: Permanent signing key not found."
+
+            echo "App files:"
+
+            ls -la "$PROJECT_DIR/app"
+
+            exit 1
+
+          fi
+
+          echo "Permanent signing key found."
+
+
+      # =====================================================
+      # 12) Build Release APK
+      # =====================================================
       - name: Build Permanent Signed Release APK
         shell: bash
         run: |
           cd "$PROJECT_DIR"
+
+          echo "Building My Life V1.5..."
 
           gradle clean assembleRelease \
             --stacktrace \
             --no-daemon
 
 
+      # =====================================================
+      # 13) Find Release APK
+      # =====================================================
+      - name: Find Release APK
+        shell: bash
+        run: |
+          APK_PATH=$(find "$PROJECT_DIR/app/build/outputs/apk/release" \
+            -type f \
+            -name "*.apk" \
+            | grep -v "unsigned" \
+            | head -n 1)
+
+
+          if [ -z "$APK_PATH" ]; then
+
+            echo "ERROR: Release APK not found."
+
+            echo ""
+            echo "Build outputs:"
+
+            find "$PROJECT_DIR/app/build/outputs" \
+              -type f || true
+
+            exit 1
+
+          fi
+
+
+          echo ""
+          echo "Release APK found:"
+          echo "$APK_PATH"
+
+
+          echo "APK_PATH=$APK_PATH" >> "$GITHUB_ENV"
+
+
+      # =====================================================
+      # 14) Locate APK Signer
+      # =====================================================
+      - name: Locate APK Signer
+        shell: bash
+        run: |
+          echo "Searching Android SDK for apksigner..."
+
+
+          APKSIGNER_PATH=$(find "$ANDROID_HOME/build-tools" \
+            -type f \
+            -name "apksigner" \
+            | sort -V \
+            | tail -n 1)
+
+
+          if [ -z "$APKSIGNER_PATH" ]; then
+
+            echo "apksigner not found. Reinstalling build-tools..."
+
+            sdkmanager "build-tools;35.0.0"
+
+
+            APKSIGNER_PATH=$(find "$ANDROID_HOME/build-tools" \
+              -type f \
+              -name "apksigner" \
+              | sort -V \
+              | tail -n 1)
+
+          fi
+
+
+          if [ -z "$APKSIGNER_PATH" ]; then
+
+            echo "ERROR: apksigner still not found."
+
+            echo ""
+            echo "Android build tools contents:"
+
+            find "$ANDROID_HOME/build-tools" \
+              -maxdepth 3 \
+              -type f || true
+
+            exit 1
+
+          fi
+
+
+          chmod +x "$APKSIGNER_PATH"
+
+
+          echo ""
+          echo "APK Signer found:"
+          echo "$APKSIGNER_PATH"
+
+
+          echo "APKSIGNER_PATH=$APKSIGNER_PATH" >> "$GITHUB_ENV"
+
+
+      # =====================================================
+      # 15) Verify APK Signature
+      # =====================================================
       - name: Verify Signed APK
         shell: bash
         run: |
-          APK="$PROJECT_DIR/app/build/outputs/apk/release/app-release.apk"
+          echo "Verifying APK signature..."
 
-          test -f "$APK"
-
-          apksigner verify \
+          "$APKSIGNER_PATH" verify \
             --verbose \
-            "$APK"
-
-          echo "APK_PATH=$APK" >> "$GITHUB_ENV"
-
-          echo "Signed APK verified successfully."
+            --print-certs \
+            "$APK_PATH"
 
 
+          echo ""
+          echo "APK signature verified successfully."
+
+
+      # =====================================================
+      # 16) Show APK Information
+      # =====================================================
+      - name: Show APK Information
+        shell: bash
+        run: |
+          echo "APK size:"
+
+          ls -lh "$APK_PATH"
+
+
+          echo ""
+          echo "Package information:"
+
+          AAPT_PATH=$(find "$ANDROID_HOME/build-tools" \
+            -type f \
+            -name "aapt" \
+            | sort -V \
+            | tail -n 1)
+
+
+          if [ -n "$AAPT_PATH" ]; then
+
+            "$AAPT_PATH" dump badging "$APK_PATH" \
+              | head -n 10
+
+          fi
+
+
+      # =====================================================
+      # 17) Prepare Final APK
+      # =====================================================
       - name: Prepare Final APK
         shell: bash
         run: |
           mkdir -p apk-output
 
+
           cp "$APK_PATH" \
-             apk-output/My-Life-V1.5-PERMANENT-SIGNED.apk
+            "apk-output/My-Life-V1.5-PERMANENT-SIGNED.apk"
+
+
+          echo ""
+          echo "Final APK:"
 
           ls -lh apk-output
 
 
-      - name: Upload APK
+      # =====================================================
+      # 18) Upload APK
+      # =====================================================
+      - name: Upload My Life V1.5 APK
         uses: actions/upload-artifact@v4
         with:
           name: My-Life-V1.5-PERMANENT-SIGNED
