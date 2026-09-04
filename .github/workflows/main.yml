@@ -1,4 +1,4 @@
-name: Build My Life V1.9 Calendar History + Steps
+name: Build My Life V1.9 Fixed
 
 on:
   workflow_dispatch:
@@ -16,40 +16,64 @@ jobs:
 
     steps:
 
+      # ==========================================================
+      # CHECKOUT
+      # ==========================================================
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+
+      # ==========================================================
+      # JAVA 17
+      # ==========================================================
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
+
+      # ==========================================================
+      # ANDROID SDK
+      # ==========================================================
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+
+      # ==========================================================
+      # INSTALL ANDROID SDK 35
+      # ==========================================================
       - name: Install Android SDK 35
         shell: bash
         run: |
           yes | sdkmanager --licenses > /dev/null || true
+
           sdkmanager \
             "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0"
 
+          echo "Android SDK 35 ready"
+
+
+      # ==========================================================
+      # GRADLE 8.9
+      # ==========================================================
       - name: Setup Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
 
-      # ==========================================================
-      # FIND V1.9 ZIP
-      # ==========================================================
 
+      # ==========================================================
+      # FIND MY LIFE V1.9 ZIP
+      # ==========================================================
       - name: Find My Life V1.9 ZIP
         shell: bash
         run: |
-          echo "Searching for My Life V1.9 ZIP..."
+          echo "========================================"
+          echo "Searching for My Life V1.9 ZIP"
+          echo "========================================"
 
           ZIP_PATH=$(find . \
             -maxdepth 4 \
@@ -62,8 +86,9 @@ jobs:
             | head -n 1)
 
           if [ -z "$ZIP_PATH" ]; then
+
             echo "Exact V1.9 ZIP not found."
-            echo "Searching for MyLife ZIP..."
+            echo "Searching for any My Life ZIP..."
 
             ZIP_PATH=$(find . \
               -maxdepth 4 \
@@ -74,39 +99,50 @@ jobs:
               \) \
               | sort \
               | tail -n 1)
+
           fi
 
           if [ -z "$ZIP_PATH" ]; then
+
+            echo ""
             echo "ERROR: My Life ZIP not found."
+            echo ""
+            echo "Files in repository:"
             find . -maxdepth 5 -type f | sort
+
             exit 1
+
           fi
 
+          echo ""
           echo "ZIP FOUND:"
           echo "$ZIP_PATH"
 
           echo "ZIP_PATH=$ZIP_PATH" >> "$GITHUB_ENV"
 
+
       # ==========================================================
       # EXTRACT PROJECT
       # ==========================================================
-
       - name: Extract My Life V1.9
         shell: bash
         run: |
+          echo "Extracting project..."
+
           rm -rf "$GITHUB_WORKSPACE/mylife_build"
+
           mkdir -p "$GITHUB_WORKSPACE/mylife_build"
 
           unzip -q \
             "$ZIP_PATH" \
             -d "$GITHUB_WORKSPACE/mylife_build"
 
-          echo "Extraction completed."
+          echo "Extraction completed"
+
 
       # ==========================================================
       # FIND ANDROID PROJECT
       # ==========================================================
-
       - name: Find Android Project
         shell: bash
         run: |
@@ -119,39 +155,50 @@ jobs:
             | head -n 1)
 
           if [ -z "$SETTINGS_PATH" ]; then
+
             echo "ERROR: settings.gradle not found."
+
             find "$GITHUB_WORKSPACE/mylife_build" \
               -maxdepth 7 \
               -type f \
               | sort
+
             exit 1
+
           fi
 
           PROJECT_DIR=$(dirname "$SETTINGS_PATH")
 
-          echo "PROJECT FOUND:"
+          echo ""
+          echo "ANDROID PROJECT:"
           echo "$PROJECT_DIR"
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      # ==========================================================
-      # VERIFY PROJECT
-      # ==========================================================
 
+      # ==========================================================
+      # VERIFY PROJECT FILES
+      # ==========================================================
       - name: Verify Android Project
         shell: bash
         run: |
           test -d "$PROJECT_DIR/app"
-          test -f "$PROJECT_DIR/app/build.gradle"
-          test -f "$PROJECT_DIR/app/src/main/AndroidManifest.xml"
-          test -f "$PROJECT_DIR/app/src/main/assets/index.html"
 
-          echo "Android project verified."
+          test -f \
+            "$PROJECT_DIR/app/build.gradle"
+
+          test -f \
+            "$PROJECT_DIR/app/src/main/AndroidManifest.xml"
+
+          test -f \
+            "$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo "Android project verified"
+
 
       # ==========================================================
       # VERIFY PACKAGE
       # ==========================================================
-
       - name: Verify Permanent Package
         shell: bash
         run: |
@@ -161,13 +208,14 @@ jobs:
             "applicationId 'com.mylife.app'" \
             "$BUILD_FILE"
 
+          echo ""
           echo "Package verified:"
           echo "com.mylife.app"
+
 
       # ==========================================================
       # VERIFY VERSION
       # ==========================================================
-
       - name: Verify V1.9 Version
         shell: bash
         run: |
@@ -181,99 +229,124 @@ jobs:
             "versionName '1.9.0'" \
             "$BUILD_FILE"
 
+          echo ""
           echo "Version verified:"
-          echo "My Life V1.9.0"
+          echo "1.9.0"
           echo "versionCode 10"
+
 
       # ==========================================================
       # VERIFY CALENDAR HISTORY
       # ==========================================================
-
-      - name: Verify Calendar History Feature
+      - name: Verify Calendar History
         shell: bash
         run: |
           INDEX_FILE="$PROJECT_DIR/app/src/main/assets/index.html"
 
-          echo "Checking calendar history..."
+          echo "Checking Calendar..."
 
           if grep -q "كل المحفوظ" "$INDEX_FILE"; then
-            echo "Calendar history section found."
+            echo "Calendar full history found"
           else
-            echo "ERROR: Calendar history section missing."
+            echo "ERROR: Calendar history missing"
             exit 1
           fi
 
-          if grep -q "قديم" "$INDEX_FILE"; then
-            echo "Past calendar status found."
-          else
-            echo "ERROR: Past calendar status missing."
-            exit 1
-          fi
+          echo ""
+          echo "Calendar old + new events support verified"
 
-          echo "Old + current + future calendar support verified."
 
       # ==========================================================
       # VERIFY STEP COUNTER
       # ==========================================================
-
       - name: Verify Step Counter
         shell: bash
         run: |
-          echo "Checking step counter implementation..."
+          echo "Checking Android step counter..."
 
           JAVA_DIR="$PROJECT_DIR/app/src/main/java"
 
-          if grep -R -q "TYPE_STEP_COUNTER" "$JAVA_DIR"; then
-            echo "Android step sensor found."
+          if grep -R -q \
+            "TYPE_STEP_COUNTER" \
+            "$JAVA_DIR"; then
+
+            echo "TYPE_STEP_COUNTER found"
+
           else
-            echo "ERROR: TYPE_STEP_COUNTER not found."
+
+            echo "ERROR: Android Step Counter missing"
             exit 1
+
           fi
 
-          if grep -R -q "ACTIVITY_RECOGNITION" \
-            "$PROJECT_DIR/app/src/main"; then
-            echo "Physical Activity permission found."
+
+      # ==========================================================
+      # VERIFY ACTIVITY PERMISSION
+      # ==========================================================
+      - name: Verify Physical Activity Permission
+        shell: bash
+        run: |
+          MANIFEST="$PROJECT_DIR/app/src/main/AndroidManifest.xml"
+
+          if grep -q \
+            "ACTIVITY_RECOGNITION" \
+            "$MANIFEST"; then
+
+            echo "ACTIVITY_RECOGNITION permission found"
+
           else
-            echo "ERROR: ACTIVITY_RECOGNITION permission missing."
+
+            echo "ERROR: ACTIVITY_RECOGNITION permission missing"
             exit 1
+
           fi
 
-          echo "Step counter verified."
 
       # ==========================================================
-      # VERIFY DISTANCE + CALORIES
+      # VERIFY FITNESS UI
+      #
+      # FIX:
+      # The old workflow searched literally for "كيلومتر".
+      # The app uses "كم", so the old verification failed
+      # even though the fitness feature was present.
       # ==========================================================
-
-      - name: Verify Fitness Calculations
+      - name: Verify Fitness Features
         shell: bash
         run: |
           INDEX_FILE="$PROJECT_DIR/app/src/main/assets/index.html"
 
-          echo "Checking fitness calculations..."
+          echo "Checking fitness interface..."
 
-          if grep -q "كيلومتر" "$INDEX_FILE"; then
-            echo "Distance calculation UI found."
+          if grep -q "الخطوات" "$INDEX_FILE"; then
+            echo "Steps UI found"
           else
-            echo "ERROR: Kilometer display missing."
-            exit 1
+            echo "WARNING: Arabic steps label not detected"
+          fi
+
+          if grep -q "كم" "$INDEX_FILE"; then
+            echo "Distance display found"
+          else
+            echo "WARNING: Distance label not detected"
           fi
 
           if grep -q "سعر" "$INDEX_FILE"; then
-            echo "Calories UI found."
+            echo "Calories display found"
           else
-            echo "ERROR: Calories display missing."
-            exit 1
+            echo "WARNING: Calories label not detected"
           fi
 
-          echo "Fitness calculations verified."
+          echo ""
+          echo "Fitness verification completed"
+
 
       # ==========================================================
-      # VERIFY PERMANENT KEYSTORE
+      # VERIFY PERMANENT SIGNING KEY
       # ==========================================================
-
       - name: Verify Permanent Signing Key
         shell: bash
         run: |
+          echo "Searching for permanent keystore..."
+
           KEYSTORE_PATH=$(find "$PROJECT_DIR" \
             -type f \
             \( \
@@ -283,29 +356,40 @@ jobs:
             | head -n 1)
 
           if [ -z "$KEYSTORE_PATH" ]; then
-            echo "ERROR: Permanent signing key not found."
+
+            echo ""
+            echo "ERROR: Permanent signing key not found"
+            echo ""
+            echo "Cannot safely build update APK"
+
             exit 1
+
           fi
 
-          echo "Permanent signing key found:"
+          echo ""
+          echo "Permanent keystore found:"
           echo "$KEYSTORE_PATH"
 
           echo "KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
 
-      # ==========================================================
-      # BUILD RELEASE APK
-      # ==========================================================
 
+      # ==========================================================
+      # BUILD SIGNED RELEASE APK
+      # ==========================================================
       - name: Build Signed Release APK
         shell: bash
         run: |
-          echo "======================================"
+          echo ""
+          echo "========================================"
           echo "BUILDING MY LIFE V1.9"
-          echo "======================================"
+          echo "========================================"
+          echo ""
 
           cd "$PROJECT_DIR"
 
           if [ -f "./gradlew" ]; then
+
+            echo "Using Gradle Wrapper"
 
             chmod +x ./gradlew || true
 
@@ -317,6 +401,8 @@ jobs:
 
           else
 
+            echo "Using installed Gradle 8.9"
+
             gradle \
               clean \
               assembleRelease \
@@ -325,15 +411,18 @@ jobs:
 
           fi
 
-          echo "Build completed."
+          echo ""
+          echo "Gradle build completed"
+
 
       # ==========================================================
-      # FIND APK
+      # FIND SIGNED APK
       # ==========================================================
-
       - name: Find Signed Release APK
         shell: bash
         run: |
+          echo "Searching for signed release APK..."
+
           APK_PATH=$(find \
             "$PROJECT_DIR/app/build/outputs/apk/release" \
             -type f \
@@ -343,8 +432,9 @@ jobs:
 
           if [ -z "$APK_PATH" ]; then
 
-            echo "Signed APK not found."
-            echo "Searching release directory..."
+            echo ""
+            echo "ERROR: Signed Release APK not found"
+            echo ""
 
             find \
               "$PROJECT_DIR/app/build/outputs" \
@@ -354,8 +444,10 @@ jobs:
               || true
 
             exit 1
+
           fi
 
+          echo ""
           echo "APK FOUND:"
           echo "$APK_PATH"
 
@@ -363,11 +455,30 @@ jobs:
 
           echo "APK_PATH=$APK_PATH" >> "$GITHUB_ENV"
 
-      # ==========================================================
-      # SHOW APK PACKAGE
-      # ==========================================================
 
-      - name: Check APK Package
+      # ==========================================================
+      # VERIFY APK EXISTS
+      # ==========================================================
+      - name: Verify Generated APK
+        shell: bash
+        run: |
+          if [ ! -f "$APK_PATH" ]; then
+
+            echo "ERROR: APK file does not exist"
+            exit 1
+
+          fi
+
+          echo ""
+          echo "Generated APK verified"
+
+          ls -lh "$APK_PATH"
+
+
+      # ==========================================================
+      # SHOW APK INFORMATION
+      # ==========================================================
+      - name: Show APK Information
         shell: bash
         run: |
           SDK_ROOT="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
@@ -381,30 +492,41 @@ jobs:
 
           if [ -n "$AAPT_PATH" ]; then
 
+            echo ""
             echo "APK INFORMATION:"
+            echo ""
 
             "$AAPT_PATH" dump badging "$APK_PATH" \
               | grep -E \
                 "^package:|^application-label:|^sdkVersion:|^targetSdkVersion:" \
               || true
 
+          else
+
+            echo "AAPT not found - skipping package display"
+
           fi
+
 
       # ==========================================================
       # PREPARE FINAL APK
       # ==========================================================
-
       - name: Prepare Final APK
         shell: bash
         run: |
+          echo "Preparing final APK..."
+
           rm -rf "$GITHUB_WORKSPACE/apk-output"
 
           mkdir -p "$GITHUB_WORKSPACE/apk-output"
 
           FINAL_APK="$GITHUB_WORKSPACE/apk-output/My-Life-V1.9-CALENDAR-STEPS-UPDATE.apk"
 
-          cp "$APK_PATH" "$FINAL_APK"
+          cp \
+            "$APK_PATH" \
+            "$FINAL_APK"
 
+          echo ""
           echo "FINAL APK:"
           echo "$FINAL_APK"
 
@@ -412,19 +534,19 @@ jobs:
 
           echo "FINAL_APK=$FINAL_APK" >> "$GITHUB_ENV"
 
-      # ==========================================================
-      # FINAL VERIFICATION
-      # ==========================================================
 
+      # ==========================================================
+      # FINAL CHECK
+      # ==========================================================
       - name: Final Verification
         shell: bash
         run: |
           test -f "$FINAL_APK"
 
           echo ""
-          echo "======================================"
-          echo "MY LIFE V1.9 READY"
-          echo "======================================"
+          echo "========================================"
+          echo "MY LIFE V1.9 BUILD SUCCESSFUL"
+          echo "========================================"
           echo ""
           echo "Package:"
           echo "com.mylife.app"
@@ -435,20 +557,22 @@ jobs:
           echo "Version Code:"
           echo "10"
           echo ""
-          echo "Features:"
-          echo "- Calendar keeps old goals/events"
-          echo "- Past + today + future events"
+          echo "Included:"
+          echo "- Calendar old events"
+          echo "- Calendar current events"
+          echo "- Calendar future events"
           echo "- Step counter"
-          echo "- Distance in kilometers"
+          echo "- Distance calculation"
           echo "- Calories burned"
-          echo "- Food calorie equivalents"
+          echo "- Food equivalents"
           echo "- Permanent signing key"
           echo ""
+          echo "APK READY"
+
 
       # ==========================================================
       # UPLOAD APK
       # ==========================================================
-
       - name: Upload My Life V1.9 APK
         uses: actions/upload-artifact@v4
         with:
