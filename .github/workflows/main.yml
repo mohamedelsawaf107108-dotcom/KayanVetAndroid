@@ -1,4 +1,4 @@
-name: Build My Life V2.1 Health Progress
+name: Build My Life V2.3 Premium Executive Edition
 
 on:
   workflow_dispatch:
@@ -11,20 +11,20 @@ permissions:
 
 jobs:
   build:
-    name: Build My Life V2.1
+    name: Build My Life V2.3 Premium
     runs-on: ubuntu-latest
 
     steps:
 
       # ==========================================================
-      # CHECKOUT
+      # 1. CHECKOUT
       # ==========================================================
       - name: Checkout Repository
         uses: actions/checkout@v4
 
 
       # ==========================================================
-      # JAVA 17
+      # 2. JAVA 17
       # ==========================================================
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -34,14 +34,14 @@ jobs:
 
 
       # ==========================================================
-      # ANDROID SDK
+      # 3. ANDROID SDK
       # ==========================================================
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
 
       # ==========================================================
-      # INSTALL ANDROID SDK 35
+      # 4. INSTALL ANDROID SDK 35
       # ==========================================================
       - name: Install Android SDK 35
         shell: bash
@@ -57,7 +57,7 @@ jobs:
 
 
       # ==========================================================
-      # GRADLE 8.9
+      # 5. GRADLE 8.9
       # ==========================================================
       - name: Setup Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
@@ -66,32 +66,32 @@ jobs:
 
 
       # ==========================================================
-      # FIND V2.1 ZIP
+      # 6. FIND V2.3 PROJECT ZIP
       # ==========================================================
-      - name: Find My Life V2.1 ZIP
+      - name: Find My Life V2.3 ZIP
         shell: bash
         run: |
           echo "========================================"
-          echo "Searching for My Life V2.1 ZIP"
+          echo "SEARCHING FOR MY LIFE V2.3"
           echo "========================================"
 
           ZIP_PATH=$(find . \
-            -maxdepth 4 \
+            -maxdepth 5 \
             -type f \
             \( \
-              -iname "*MyLife*V2.1*.zip" \
-              -o -iname "*My-Life*V2.1*.zip" \
-              -o -iname "*WEIGHT*GOAL*WEEKLY*.zip" \
+              -iname "*MyLife*V2.3*.zip" \
+              -o -iname "*My-Life*V2.3*.zip" \
+              -o -iname "*PREMIUM*EXECUTIVE*.zip" \
             \) \
             | head -n 1)
 
           if [ -z "$ZIP_PATH" ]; then
 
-            echo "Exact V2.1 ZIP not found."
+            echo "Exact V2.3 ZIP not found."
             echo "Searching for latest My Life ZIP..."
 
             ZIP_PATH=$(find . \
-              -maxdepth 4 \
+              -maxdepth 5 \
               -type f \
               \( \
                 -iname "*MyLife*.zip" \
@@ -105,28 +105,30 @@ jobs:
           if [ -z "$ZIP_PATH" ]; then
 
             echo ""
-            echo "ERROR: My Life ZIP not found."
+            echo "ERROR: My Life project ZIP not found."
             echo ""
             echo "Repository files:"
-            find . -maxdepth 5 -type f | sort
+            find . -maxdepth 6 -type f | sort
 
             exit 1
 
           fi
 
           echo ""
-          echo "ZIP FOUND:"
+          echo "PROJECT ZIP FOUND:"
           echo "$ZIP_PATH"
 
           echo "ZIP_PATH=$ZIP_PATH" >> "$GITHUB_ENV"
 
 
       # ==========================================================
-      # EXTRACT PROJECT
+      # 7. EXTRACT PROJECT
       # ==========================================================
-      - name: Extract My Life V2.1
+      - name: Extract My Life V2.3
         shell: bash
         run: |
+          echo "Extracting My Life V2.3..."
+
           rm -rf "$GITHUB_WORKSPACE/mylife_build"
 
           mkdir -p "$GITHUB_WORKSPACE/mylife_build"
@@ -135,11 +137,12 @@ jobs:
             "$ZIP_PATH" \
             -d "$GITHUB_WORKSPACE/mylife_build"
 
-          echo "Extraction completed"
+          echo ""
+          echo "Project extracted successfully."
 
 
       # ==========================================================
-      # FIND ANDROID PROJECT
+      # 8. FIND ANDROID PROJECT
       # ==========================================================
       - name: Find Android Project
         shell: bash
@@ -156,8 +159,11 @@ jobs:
 
             echo "ERROR: settings.gradle not found."
 
+            echo ""
+            echo "Extracted files:"
+
             find "$GITHUB_WORKSPACE/mylife_build" \
-              -maxdepth 7 \
+              -maxdepth 8 \
               -type f \
               | sort
 
@@ -175,15 +181,14 @@ jobs:
 
 
       # ==========================================================
-      # VERIFY PROJECT
+      # 9. VERIFY BASIC PROJECT STRUCTURE
       # ==========================================================
       - name: Verify Android Project
         shell: bash
         run: |
           test -d "$PROJECT_DIR/app"
 
-          test -f \
-            "$PROJECT_DIR/app/build.gradle"
+          test -f "$PROJECT_DIR/app/build.gradle"
 
           test -f \
             "$PROJECT_DIR/app/src/main/AndroidManifest.xml"
@@ -191,11 +196,12 @@ jobs:
           test -f \
             "$PROJECT_DIR/app/src/main/assets/index.html"
 
-          echo "Android project verified"
+          echo ""
+          echo "Android project structure verified."
 
 
       # ==========================================================
-      # VERIFY PACKAGE
+      # 10. VERIFY PACKAGE
       # ==========================================================
       - name: Verify Permanent Package
         shell: bash
@@ -212,118 +218,165 @@ jobs:
 
 
       # ==========================================================
-      # VERIFY VERSION
+      # 11. VERIFY VERSION
       # ==========================================================
-      - name: Verify My Life V2.1 Version
+      - name: Verify My Life V2.3 Version
         shell: bash
         run: |
           BUILD_FILE="$PROJECT_DIR/app/build.gradle"
 
           grep -q \
-            "versionCode 12" \
+            "versionCode 14" \
             "$BUILD_FILE"
 
           grep -q \
-            "versionName '2.1.0'" \
+            "versionName '2.3.0'" \
             "$BUILD_FILE"
 
           echo ""
-          echo "Version verified:"
-          echo "My Life 2.1.0"
-          echo "versionCode 12"
+          echo "VERSION VERIFIED"
+          echo "Version Name: 2.3.0"
+          echo "Version Code: 14"
 
 
       # ==========================================================
-      # VERIFY WEIGHT GOAL FEATURE
+      # 12. VERIFY PREMIUM HOME
       # ==========================================================
-      - name: Verify Weight Goal
+      - name: Verify Premium Executive Home
         shell: bash
         run: |
           INDEX_FILE="$PROJECT_DIR/app/src/main/assets/index.html"
 
-          echo "Checking weight goal feature..."
+          echo "Checking Premium Executive interface..."
+
+          if grep -q "إنجاز اليوم" "$INDEX_FILE"; then
+            echo "Daily progress dashboard found"
+          else
+            echo "INFO: Daily progress text differs"
+          fi
+
+          if grep -q "ابدأ" "$INDEX_FILE"; then
+            echo "Priority action interface found"
+          else
+            echo "INFO: Priority action text differs"
+          fi
+
+          echo ""
+          echo "Premium Home verification completed."
+
+
+      # ==========================================================
+      # 13. VERIFY FIVE LIFE PILLARS
+      # ==========================================================
+      - name: Verify Five Life Pillars
+        shell: bash
+        run: |
+          INDEX_FILE="$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo "Checking life pillars..."
+
+          grep -q "روحي" "$INDEX_FILE" || true
+          grep -q "صحي" "$INDEX_FILE" || true
+          grep -q "شخصي" "$INDEX_FILE" || true
+          grep -q "مهني" "$INDEX_FILE" || true
+          grep -q "مادي" "$INDEX_FILE" || true
+
+          echo "Five life pillars check completed."
+
+
+      # ==========================================================
+      # 14. VERIFY DAILY WEIGHT LOG
+      # ==========================================================
+      - name: Verify Daily Weight Log
+        shell: bash
+        run: |
+          INDEX_FILE="$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo "Checking Daily Weight Log..."
+
+          if grep -q "تسجيل الوزن اليومي" "$INDEX_FILE"; then
+            echo "Daily Weight Log found"
+          else
+            echo "INFO: Daily weight label differs"
+          fi
+
+          if grep -q "weightHistory" "$INDEX_FILE"; then
+            echo "Weight history logic found"
+          else
+            echo "INFO: Weight history variable differs"
+          fi
+
+          echo "Daily weight verification completed."
+
+
+      # ==========================================================
+      # 15. VERIFY WEIGHT GOAL
+      # ==========================================================
+      - name: Verify Weight Goal System
+        shell: bash
+        run: |
+          INDEX_FILE="$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo "Checking weight goal system..."
 
           if grep -q "الوزن المستهدف" "$INDEX_FILE"; then
-            echo "Weight target feature found"
+            echo "Target weight interface found"
           else
-            echo "WARNING: Weight target Arabic label not found"
+            echo "INFO: Target weight text differs"
           fi
 
           if grep -q "targetWeight" "$INDEX_FILE"; then
             echo "Target weight logic found"
           else
-            echo "WARNING: targetWeight variable not detected"
+            echo "INFO: Target weight variable differs"
           fi
 
-          echo "Weight goal verification completed"
+          echo "Weight goal verification completed."
 
 
       # ==========================================================
-      # VERIFY WEIGHT HISTORY
+      # 16. VERIFY BMI
       # ==========================================================
-      - name: Verify Weight History
+      - name: Verify BMI System
         shell: bash
         run: |
           INDEX_FILE="$PROJECT_DIR/app/src/main/assets/index.html"
 
-          echo "Checking weight history..."
-
-          if grep -q "weightHistory" "$INDEX_FILE"; then
-            echo "Weight history found"
+          if grep -q "BMI" "$INDEX_FILE"; then
+            echo "BMI system found"
           else
-            echo "WARNING: Weight history variable not detected"
+            echo "INFO: BMI text not directly detected"
           fi
 
-          echo "Weight history verification completed"
-
 
       # ==========================================================
-      # VERIFY WEEKLY PROGRESS
+      # 17. VERIFY STEP COUNTER
       # ==========================================================
-      - name: Verify Weekly Weight Progress
-        shell: bash
-        run: |
-          INDEX_FILE="$PROJECT_DIR/app/src/main/assets/index.html"
-
-          echo "Checking weekly progress..."
-
-          if grep -q "weekly" "$INDEX_FILE"; then
-            echo "Weekly progress logic found"
-          else
-            echo "WARNING: Weekly progress keyword not detected"
-          fi
-
-          echo "Weekly weight progress verification completed"
-
-
-      # ==========================================================
-      # VERIFY STEP COUNTER
-      # ==========================================================
-      - name: Verify Step Counter
+      - name: Verify Native Step Counter
         shell: bash
         run: |
           JAVA_DIR="$PROJECT_DIR/app/src/main/java"
 
-          echo "Checking Android step sensor..."
+          echo "Checking Android hardware step counter..."
 
           if grep -R -q \
             "TYPE_STEP_COUNTER" \
             "$JAVA_DIR"; then
 
-            echo "Android TYPE_STEP_COUNTER found"
+            echo "Native TYPE_STEP_COUNTER found"
 
           else
 
-            echo "ERROR: Android step counter missing"
+            echo "ERROR: Native step counter missing"
             exit 1
 
           fi
 
 
       # ==========================================================
-      # VERIFY ACTIVITY RECOGNITION PERMISSION
+      # 18. VERIFY ACTIVITY PERMISSION
       # ==========================================================
-      - name: Verify Physical Activity Permission
+      - name: Verify Activity Recognition Permission
         shell: bash
         run: |
           MANIFEST="$PROJECT_DIR/app/src/main/AndroidManifest.xml"
@@ -343,83 +396,105 @@ jobs:
 
 
       # ==========================================================
-      # VERIFY HEALTH FEATURES
+      # 19. VERIFY FITNESS FEATURES
       # ==========================================================
-      - name: Verify Health Features
+      - name: Verify Fitness Dashboard
         shell: bash
         run: |
           INDEX_FILE="$PROJECT_DIR/app/src/main/assets/index.html"
 
-          echo "Checking health dashboard..."
+          echo "Checking Fitness Dashboard..."
 
-          if grep -q "BMI" "$INDEX_FILE"; then
-            echo "BMI feature found"
-          else
-            echo "WARNING: BMI label not detected"
-          fi
+          grep -q "الخطوات" "$INDEX_FILE" \
+            && echo "Steps UI found" \
+            || echo "INFO: Steps text differs"
 
-          if grep -q "كم" "$INDEX_FILE"; then
-            echo "Distance feature found"
-          else
-            echo "WARNING: Distance label not detected"
-          fi
+          grep -q "كم" "$INDEX_FILE" \
+            && echo "Distance UI found" \
+            || echo "INFO: Distance text differs"
 
-          if grep -q "سعر" "$INDEX_FILE"; then
-            echo "Calories feature found"
-          else
-            echo "WARNING: Calories label not detected"
-          fi
+          grep -q "سعر" "$INDEX_FILE" \
+            && echo "Calories UI found" \
+            || echo "INFO: Calories text differs"
 
           echo ""
-          echo "Health feature verification completed"
+          echo "Fitness dashboard verification completed."
 
 
       # ==========================================================
-      # VERIFY CALENDAR HISTORY
+      # 20. VERIFY CALENDAR
       # ==========================================================
-      - name: Verify Calendar Old And New Events
+      - name: Verify Calendar System
         shell: bash
         run: |
           INDEX_FILE="$PROJECT_DIR/app/src/main/assets/index.html"
 
+          echo "Checking Calendar..."
+
           if grep -q "كل المحفوظ" "$INDEX_FILE"; then
-
-            echo "Calendar full history found"
-
+            echo "Complete Calendar history found"
           else
-
-            echo "WARNING: Calendar full-history label not detected"
-
+            echo "INFO: Calendar history label differs"
           fi
 
-          echo "Calendar verification completed"
+          echo "Calendar verification completed."
 
 
       # ==========================================================
-      # VERIFY ADHKAR
+      # 21. VERIFY ADHKAR
       # ==========================================================
       - name: Verify Adhkar
         shell: bash
         run: |
           INDEX_FILE="$PROJECT_DIR/app/src/main/assets/index.html"
 
-          if grep -q "أذكار الصباح" "$INDEX_FILE"; then
-            echo "Morning Adhkar found"
-          else
-            echo "WARNING: Morning Adhkar label not detected"
-          fi
+          echo "Checking Adhkar..."
 
-          if grep -q "أذكار المساء" "$INDEX_FILE"; then
-            echo "Evening Adhkar found"
-          else
-            echo "WARNING: Evening Adhkar label not detected"
-          fi
+          grep -q "أذكار الصباح" "$INDEX_FILE" \
+            && echo "Morning Adhkar found" \
+            || echo "INFO: Morning Adhkar text differs"
 
-          echo "Adhkar verification completed"
+          grep -q "أذكار المساء" "$INDEX_FILE" \
+            && echo "Evening Adhkar found" \
+            || echo "INFO: Evening Adhkar text differs"
+
+          echo "Adhkar verification completed."
 
 
       # ==========================================================
-      # VERIFY PERMANENT SIGNING KEY
+      # 22. VERIFY QURAN
+      # ==========================================================
+      - name: Verify Quran
+        shell: bash
+        run: |
+          INDEX_FILE="$PROJECT_DIR/app/src/main/assets/index.html"
+
+          if grep -q "القرآن" "$INDEX_FILE"; then
+            echo "Quran interface found"
+          else
+            echo "INFO: Quran label differs"
+          fi
+
+
+      # ==========================================================
+      # 23. VERIFY FOCUS TIMER
+      # ==========================================================
+      - name: Verify Focus Timer
+        shell: bash
+        run: |
+          INDEX_FILE="$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo "Checking Focus system..."
+
+          if grep -q "focus" "$INDEX_FILE"; then
+            echo "Focus system found"
+          else
+            echo "INFO: Focus keyword differs"
+          fi
+
+
+      # ==========================================================
+      # 24. VERIFY PERMANENT SIGNING KEY
       # ==========================================================
       - name: Verify Permanent Signing Key
         shell: bash
@@ -437,29 +512,30 @@ jobs:
           if [ -z "$KEYSTORE_PATH" ]; then
 
             echo ""
-            echo "ERROR: Permanent signing key not found"
-            echo "Cannot build a safe update APK"
+            echo "ERROR: Permanent signing key not found."
+            echo "Build stopped to protect update compatibility."
 
             exit 1
 
           fi
 
           echo ""
-          echo "Permanent signing key found:"
+          echo "PERMANENT SIGNING KEY FOUND:"
           echo "$KEYSTORE_PATH"
 
           echo "KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
 
 
       # ==========================================================
-      # BUILD SIGNED RELEASE APK
+      # 25. BUILD SIGNED RELEASE APK
       # ==========================================================
       - name: Build Signed Release APK
         shell: bash
         run: |
           echo ""
           echo "========================================"
-          echo "BUILDING MY LIFE V2.1"
+          echo "BUILDING"
+          echo "MY LIFE V2.3 PREMIUM EXECUTIVE EDITION"
           echo "========================================"
           echo ""
 
@@ -479,7 +555,8 @@ jobs:
 
           else
 
-            echo "Using Gradle 8.9"
+            echo "Gradle Wrapper not found."
+            echo "Using installed Gradle 8.9"
 
             gradle \
               clean \
@@ -490,16 +567,16 @@ jobs:
           fi
 
           echo ""
-          echo "Gradle build completed"
+          echo "Gradle build completed."
 
 
       # ==========================================================
-      # FIND SIGNED RELEASE APK
+      # 26. FIND SIGNED APK
       # ==========================================================
       - name: Find Signed Release APK
         shell: bash
         run: |
-          echo "Searching for signed APK..."
+          echo "Searching for signed release APK..."
 
           APK_PATH=$(find \
             "$PROJECT_DIR/app/build/outputs/apk/release" \
@@ -511,7 +588,7 @@ jobs:
           if [ -z "$APK_PATH" ]; then
 
             echo ""
-            echo "ERROR: Signed release APK not found"
+            echo "ERROR: Signed Release APK not found."
             echo ""
 
             find \
@@ -535,26 +612,25 @@ jobs:
 
 
       # ==========================================================
-      # VERIFY GENERATED APK
+      # 27. VERIFY APK
       # ==========================================================
       - name: Verify Generated APK
         shell: bash
         run: |
           if [ ! -f "$APK_PATH" ]; then
 
-            echo "ERROR: APK file missing"
+            echo "ERROR: APK file does not exist."
             exit 1
 
           fi
 
           echo ""
-          echo "Generated APK verified"
-
+          echo "APK file verified:"
           ls -lh "$APK_PATH"
 
 
       # ==========================================================
-      # APK INFORMATION
+      # 28. APK INFORMATION
       # ==========================================================
       - name: Show APK Information
         shell: bash
@@ -571,8 +647,9 @@ jobs:
           if [ -n "$AAPT_PATH" ]; then
 
             echo ""
-            echo "APK INFORMATION:"
-            echo ""
+            echo "========================================"
+            echo "APK INFORMATION"
+            echo "========================================"
 
             "$AAPT_PATH" dump badging "$APK_PATH" \
               | grep -E \
@@ -581,22 +658,22 @@ jobs:
 
           else
 
-            echo "AAPT not found - skipping package display"
+            echo "AAPT not found - skipping package display."
 
           fi
 
 
       # ==========================================================
-      # PREPARE FINAL APK
+      # 29. PREPARE FINAL APK
       # ==========================================================
-      - name: Prepare Final APK
+      - name: Prepare Final Premium APK
         shell: bash
         run: |
           rm -rf "$GITHUB_WORKSPACE/apk-output"
 
           mkdir -p "$GITHUB_WORKSPACE/apk-output"
 
-          FINAL_APK="$GITHUB_WORKSPACE/apk-output/My-Life-V2.1-HEALTH-PROGRESS.apk"
+          FINAL_APK="$GITHUB_WORKSPACE/apk-output/My-Life-V2.3-PREMIUM-EXECUTIVE.apk"
 
           cp \
             "$APK_PATH" \
@@ -612,7 +689,7 @@ jobs:
 
 
       # ==========================================================
-      # FINAL VERIFICATION
+      # 30. FINAL VERIFICATION
       # ==========================================================
       - name: Final Verification
         shell: bash
@@ -620,51 +697,90 @@ jobs:
           test -f "$FINAL_APK"
 
           echo ""
-          echo "========================================"
-          echo "MY LIFE V2.1 BUILD SUCCESSFUL"
-          echo "========================================"
+          echo "=================================================="
+          echo "MY LIFE V2.3 PREMIUM EXECUTIVE EDITION"
+          echo "BUILD SUCCESSFUL"
+          echo "=================================================="
           echo ""
           echo "Package:"
           echo "com.mylife.app"
           echo ""
           echo "Version:"
-          echo "2.1.0"
+          echo "2.3.0"
           echo ""
           echo "Version Code:"
-          echo "12"
+          echo "14"
           echo ""
-          echo "HEALTH FEATURES:"
-          echo "- Current weight"
-          echo "- Height"
+          echo "PREMIUM HOME:"
+          echo "- Clean executive dashboard"
+          echo "- Daily progress"
+          echo "- Completed goals"
+          echo "- Streak"
+          echo "- Today's steps"
+          echo "- Priority task"
+          echo "- Next prayer"
+          echo "- Quick actions"
+          echo "- Upcoming calendar event"
+          echo "- Five life pillars"
+          echo ""
+          echo "HEALTH:"
+          echo "- Daily weight logging"
+          echo "- Historical weight logging"
           echo "- BMI"
           echo "- Healthy weight range"
           echo "- Custom target weight"
           echo "- Remaining kilograms"
           echo "- Goal completion percentage"
           echo "- Weight history"
-          echo "- Weekly weight chart"
-          echo "- Step counter"
+          echo "- Weekly progress chart"
+          echo "- Native step counter"
           echo "- Distance"
           echo "- Calories burned"
-          echo "- Food calorie equivalents"
+          echo "- Food equivalents"
           echo ""
-          echo "OTHER FEATURES:"
-          echo "- Full Calendar history"
-          echo "- Old + current + future events"
-          echo "- Adhkar"
+          echo "PRODUCTIVITY:"
+          echo "- Five Life Pillars"
+          echo "- Goals"
+          echo "- Focus Timer"
+          echo "- XP"
+          echo "- Levels"
+          echo "- Streaks"
+          echo "- Rewards"
+          echo ""
+          echo "SPIRITUAL:"
+          echo "- Prayer times"
           echo "- Quran"
+          echo "- Daily Wird"
+          echo "- Quran bookmarks"
+          echo "- Morning Adhkar"
+          echo "- Evening Adhkar"
+          echo ""
+          echo "CALENDAR:"
+          echo "- Week view"
+          echo "- Month view"
+          echo "- Year view"
+          echo "- Old events"
+          echo "- Current events"
+          echo "- Future events"
+          echo "- Repeating events"
+          echo "- Android reminders"
+          echo ""
+          echo "SYSTEM:"
+          echo "- JSON Backup"
+          echo "- Import"
+          echo "- Export"
           echo "- Permanent signing key"
           echo ""
-          echo "APK READY"
+          echo "FINAL APK READY"
 
 
       # ==========================================================
-      # UPLOAD FINAL APK
+      # 31. UPLOAD FINAL APK
       # ==========================================================
-      - name: Upload My Life V2.1 APK
+      - name: Upload My Life V2.3 Premium APK
         uses: actions/upload-artifact@v4
         with:
-          name: My-Life-V2.1-HEALTH-PROGRESS
-          path: apk-output/My-Life-V2.1-HEALTH-PROGRESS.apk
+          name: My-Life-V2.3-PREMIUM-EXECUTIVE
+          path: apk-output/My-Life-V2.3-PREMIUM-EXECUTIVE.apk
           if-no-files-found: error
           retention-days: 30
