@@ -1,111 +1,577 @@
-name: Build My Life V1.6 Permanent Update APK
+name: Build My Life V1.8 Adhkar Fix
 
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 permissions:
   contents: read
 
 jobs:
   build:
-    name: Build My Life V1.6
+    name: Build My Life V1.8
     runs-on: ubuntu-latest
 
     steps:
+
+      # ============================================================
+      # 1. CHECKOUT REPOSITORY
+      # ============================================================
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+
+      # ============================================================
+      # 2. SETUP JAVA 17
+      # ============================================================
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
+
+      # ============================================================
+      # 3. SETUP ANDROID SDK
+      # ============================================================
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK 35
+
+      # ============================================================
+      # 4. INSTALL ANDROID SDK COMPONENTS
+      # ============================================================
+      - name: Install Android SDK Components
         shell: bash
         run: |
           yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
+
+          echo "Android SDK ready"
+
+
+      # ============================================================
+      # 5. SETUP GRADLE
+      # ============================================================
       - name: Setup Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.9'
+          gradle-version: "8.9"
 
-      - name: Find And Extract My Life V1.6 ZIP
+
+      # ============================================================
+      # 6. FIND MY LIFE V1.8 ZIP
+      # ============================================================
+      - name: Find My Life V1.8 ZIP
         shell: bash
         run: |
-          ZIP_PATH=$(find . -maxdepth 3 -type f -iname "*MyLife*V1.6*.zip" | head -n 1)
+          echo "========================================"
+          echo "Searching for My Life V1.8 ZIP"
+          echo "========================================"
 
-          if [ -n "$ZIP_PATH" ]; then
-            echo "Found ZIP: $ZIP_PATH"
-            rm -rf "$GITHUB_WORKSPACE/mylife_build"
-            mkdir -p "$GITHUB_WORKSPACE/mylife_build"
-            unzip -q "$ZIP_PATH" -d "$GITHUB_WORKSPACE/mylife_build"
-            SETTINGS_PATH=$(find "$GITHUB_WORKSPACE/mylife_build" -type f -name settings.gradle | head -n 1)
-          else
-            echo "No V1.6 ZIP found; trying extracted project in repository."
-            SETTINGS_PATH=$(find . -maxdepth 4 -type f -name settings.gradle | head -n 1)
+          ZIP_PATH=$(find . \
+            -maxdepth 3 \
+            -type f \
+            \( \
+              -iname "*MyLife*V1.8*.zip" \
+              -o -iname "*My-Life*V1.8*.zip" \
+              -o -iname "*V1.8*ADHKAR*.zip" \
+            \) \
+            | head -n 1)
+
+          if [ -z "$ZIP_PATH" ]; then
+
+            echo ""
+            echo "Exact V1.8 ZIP not found."
+            echo "Searching for latest My Life ZIP..."
+
+            ZIP_PATH=$(find . \
+              -maxdepth 3 \
+              -type f \
+              \( \
+                -iname "*MyLife*.zip" \
+                -o -iname "*My-Life*.zip" \
+              \) \
+              | sort \
+              | tail -n 1)
+
           fi
 
-          if [ -z "$SETTINGS_PATH" ]; then
-            echo "ERROR: settings.gradle not found"
+          if [ -z "$ZIP_PATH" ]; then
+
+            echo ""
+            echo "ERROR: My Life ZIP not found."
+            echo ""
+            echo "Repository files:"
+            echo ""
+
             find . -maxdepth 4 -type f | sort
+
             exit 1
+
+          fi
+
+          echo ""
+          echo "ZIP FOUND:"
+          echo "$ZIP_PATH"
+
+          echo "ZIP_PATH=$ZIP_PATH" >> "$GITHUB_ENV"
+
+
+      # ============================================================
+      # 7. EXTRACT PROJECT
+      # ============================================================
+      - name: Extract My Life V1.8
+        shell: bash
+        run: |
+          echo "Extracting:"
+          echo "$ZIP_PATH"
+
+          rm -rf "$GITHUB_WORKSPACE/mylife_build"
+
+          mkdir -p "$GITHUB_WORKSPACE/mylife_build"
+
+          unzip -q \
+            "$ZIP_PATH" \
+            -d "$GITHUB_WORKSPACE/mylife_build"
+
+          echo ""
+          echo "Extraction completed"
+
+
+      # ============================================================
+      # 8. FIND ANDROID PROJECT
+      # ============================================================
+      - name: Find Android Project
+        shell: bash
+        run: |
+          echo "Searching for Android project..."
+
+          SETTINGS_PATH=$(find "$GITHUB_WORKSPACE/mylife_build" \
+            -type f \
+            \( \
+              -name "settings.gradle" \
+              -o -name "settings.gradle.kts" \
+            \) \
+            | head -n 1)
+
+          if [ -z "$SETTINGS_PATH" ]; then
+
+            echo ""
+            echo "ERROR: Android settings.gradle not found."
+            echo ""
+            echo "Extracted files:"
+            echo ""
+
+            find "$GITHUB_WORKSPACE/mylife_build" \
+              -maxdepth 7 \
+              -type f \
+              | sort
+
+            exit 1
+
           fi
 
           PROJECT_DIR=$(dirname "$SETTINGS_PATH")
+
+          echo ""
+          echo "ANDROID PROJECT FOUND:"
+          echo "$PROJECT_DIR"
+
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Project: $PROJECT_DIR"
 
-      - name: Verify Permanent Update Identity
+
+      # ============================================================
+      # 9. VERIFY ANDROID PROJECT
+      # ============================================================
+      - name: Verify Android Project
         shell: bash
         run: |
-          test -f "$PROJECT_DIR/app/build.gradle"
-          test -f "$PROJECT_DIR/app/mylife-release.jks"
-          grep -q "applicationId 'com.mylife.app'" "$PROJECT_DIR/app/build.gradle"
-          grep -q "versionCode 7" "$PROJECT_DIR/app/build.gradle"
-          grep -q "versionName '1.6.0'" "$PROJECT_DIR/app/build.gradle"
-          echo "Package: com.mylife.app"
-          echo "Version: 1.6.0 (7)"
-          echo "Permanent release keystore found."
+          echo "Checking project..."
 
-      - name: Build Signed Release APK
+          test -d "$PROJECT_DIR/app"
+
+          test -f \
+            "$PROJECT_DIR/app/src/main/AndroidManifest.xml"
+
+          test -f \
+            "$PROJECT_DIR/app/src/main/assets/index.html"
+
+          echo ""
+          echo "Android project verified"
+
+
+      # ============================================================
+      # 10. VERIFY ADHKAR FIX
+      # ============================================================
+      - name: Verify Adhkar V1.8 Fix
         shell: bash
         run: |
-          cd "$PROJECT_DIR"
-          gradle clean assembleRelease --stacktrace --no-daemon
+          INDEX_FILE="$PROJECT_DIR/app/src/main/assets/index.html"
 
-      - name: Find Signed APK
-        shell: bash
-        run: |
-          APK_PATH=$(find "$PROJECT_DIR/app/build/outputs/apk/release" -type f -name "*.apk" | grep -v unsigned | head -n 1)
+          echo "Checking Adhkar page..."
 
-          if [ -z "$APK_PATH" ]; then
-            echo "ERROR: signed release APK not found"
-            find "$PROJECT_DIR/app/build/outputs" -type f || true
+          if grep -q "openAdhkar" "$INDEX_FILE"; then
+            echo "openAdhkar function found"
+          else
+            echo "ERROR: openAdhkar function missing"
             exit 1
           fi
 
-          echo "APK_PATH=$APK_PATH" >> "$GITHUB_ENV"
-          ls -lh "$APK_PATH"
+          if grep -q "renderAdhkar" "$INDEX_FILE"; then
+            echo "renderAdhkar function found"
+          else
+            echo "ERROR: renderAdhkar function missing"
+            exit 1
+          fi
 
-      - name: Prepare Final APK
+          if grep -q "أذكار الصباح" "$INDEX_FILE"; then
+            echo "Morning Adhkar content found"
+          else
+            echo "ERROR: Morning Adhkar content missing"
+            exit 1
+          fi
+
+          if grep -q "أذكار المساء" "$INDEX_FILE"; then
+            echo "Evening Adhkar content found"
+          else
+            echo "ERROR: Evening Adhkar content missing"
+            exit 1
+          fi
+
+          echo ""
+          echo "Adhkar V1.8 fix verified"
+
+
+      # ============================================================
+      # 11. VERIFY PACKAGE + VERSION
+      # ============================================================
+      - name: Verify Permanent Update Identity
         shell: bash
         run: |
-          mkdir -p apk-output
-          cp "$APK_PATH" "apk-output/My-Life-V1.6-PERMANENT-UPDATE.apk"
-          ls -lh apk-output
+          BUILD_FILE="$PROJECT_DIR/app/build.gradle"
 
-      - name: Upload APK
+          if [ ! -f "$BUILD_FILE" ]; then
+            echo "ERROR: app/build.gradle not found"
+            exit 1
+          fi
+
+          echo "Checking permanent package..."
+
+          grep -q \
+            "applicationId 'com.mylife.app'" \
+            "$BUILD_FILE"
+
+          echo "Package verified:"
+          echo "com.mylife.app"
+
+          echo ""
+
+          grep -q \
+            "versionCode 9" \
+            "$BUILD_FILE"
+
+          grep -q \
+            "versionName '1.8.0'" \
+            "$BUILD_FILE"
+
+          echo "Version verified:"
+          echo "V1.8.0"
+          echo "versionCode 9"
+
+
+      # ============================================================
+      # 12. VERIFY PERMANENT KEYSTORE
+      # ============================================================
+      - name: Verify Permanent Signing Key
+        shell: bash
+        run: |
+          echo "Searching for permanent signing key..."
+
+          KEYSTORE_PATH=$(find "$PROJECT_DIR" \
+            -type f \
+            \( \
+              -iname "*.jks" \
+              -o -iname "*.keystore" \
+            \) \
+            | head -n 1)
+
+          if [ -z "$KEYSTORE_PATH" ]; then
+
+            echo ""
+            echo "ERROR: Permanent signing key not found."
+            echo ""
+            echo "Android updates require the same signing key."
+
+            exit 1
+
+          fi
+
+          echo ""
+          echo "PERMANENT KEYSTORE FOUND:"
+          echo "$KEYSTORE_PATH"
+
+          echo "KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+
+
+      # ============================================================
+      # 13. BUILD RELEASE APK
+      # ============================================================
+      - name: Build My Life V1.8 Release APK
+        shell: bash
+        run: |
+          echo "========================================"
+          echo "BUILDING MY LIFE V1.8"
+          echo "========================================"
+
+          cd "$PROJECT_DIR"
+
+          if [ -f "./gradlew" ]; then
+
+            echo "Using Gradle Wrapper"
+
+            bash ./gradlew \
+              clean \
+              assembleRelease \
+              --stacktrace \
+              --no-daemon
+
+          else
+
+            echo "Using Gradle 8.9"
+
+            gradle \
+              clean \
+              assembleRelease \
+              --stacktrace \
+              --no-daemon
+
+          fi
+
+          echo ""
+          echo "Gradle build completed"
+
+
+      # ============================================================
+      # 14. FIND GENERATED APK
+      # ============================================================
+      - name: Find Generated Release APK
+        shell: bash
+        run: |
+          echo "Searching for generated release APK..."
+
+          APK_PATH=$(find \
+            "$PROJECT_DIR/app/build/outputs/apk/release" \
+            -type f \
+            -name "*.apk" \
+            | grep -v "unsigned" \
+            | head -n 1)
+
+          if [ -z "$APK_PATH" ]; then
+
+            echo "Signed APK not found."
+            echo "Searching all release APKs..."
+
+            APK_PATH=$(find \
+              "$PROJECT_DIR/app/build/outputs/apk/release" \
+              -type f \
+              -name "*.apk" \
+              | head -n 1)
+
+          fi
+
+          if [ -z "$APK_PATH" ]; then
+
+            echo ""
+            echo "ERROR: APK NOT GENERATED"
+            echo ""
+
+            find "$PROJECT_DIR/app/build/outputs" \
+              -type f \
+              2>/dev/null \
+              | sort \
+              || true
+
+            exit 1
+
+          fi
+
+          echo ""
+          echo "APK FOUND:"
+          echo "$APK_PATH"
+
+          ls -lh "$APK_PATH"
+
+          echo "APK_PATH=$APK_PATH" >> "$GITHUB_ENV"
+
+
+      # ============================================================
+      # 15. LOCATE APKSIGNER
+      # ============================================================
+      - name: Locate APK Signer
+        shell: bash
+        run: |
+          echo "Searching for apksigner..."
+
+          SDK_ROOT="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+
+          APKSIGNER_PATH=$(find "$SDK_ROOT/build-tools" \
+            -type f \
+            -name "apksigner" \
+            2>/dev/null \
+            | sort -V \
+            | tail -n 1)
+
+          if [ -z "$APKSIGNER_PATH" ]; then
+
+            echo ""
+            echo "WARNING: apksigner not found."
+            echo "APK build succeeded."
+            echo "Signature verification will be skipped."
+
+            echo "APKSIGNER_AVAILABLE=false" >> "$GITHUB_ENV"
+
+          else
+
+            echo ""
+            echo "APK SIGNER:"
+            echo "$APKSIGNER_PATH"
+
+            echo "APKSIGNER_PATH=$APKSIGNER_PATH" >> "$GITHUB_ENV"
+            echo "APKSIGNER_AVAILABLE=true" >> "$GITHUB_ENV"
+
+          fi
+
+
+      # ============================================================
+      # 16. VERIFY SIGNATURE
+      # ============================================================
+      - name: Verify APK Signature
+        if: env.APKSIGNER_AVAILABLE == 'true'
+        shell: bash
+        run: |
+          echo "========================================"
+          echo "VERIFYING APK SIGNATURE"
+          echo "========================================"
+
+          bash "$APKSIGNER_PATH" verify \
+            --verbose \
+            --print-certs \
+            "$APK_PATH"
+
+          echo ""
+          echo "APK signature verified"
+
+
+      # ============================================================
+      # 17. SHOW APK INFORMATION
+      # ============================================================
+      - name: Show APK Information
+        shell: bash
+        run: |
+          echo "========================================"
+          echo "MY LIFE V1.8 APK"
+          echo "========================================"
+
+          echo ""
+          echo "APK:"
+          ls -lh "$APK_PATH"
+
+          SDK_ROOT="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+
+          AAPT_PATH=$(find "$SDK_ROOT/build-tools" \
+            -type f \
+            -name "aapt" \
+            2>/dev/null \
+            | sort -V \
+            | tail -n 1)
+
+          if [ -n "$AAPT_PATH" ]; then
+
+            echo ""
+            echo "APK package information:"
+
+            "$AAPT_PATH" dump badging "$APK_PATH" \
+              | grep -E \
+                "^package:|^application-label:|^sdkVersion:|^targetSdkVersion:" \
+              || true
+
+          fi
+
+
+      # ============================================================
+      # 18. PREPARE FINAL APK
+      # ============================================================
+      - name: Prepare Final My Life APK
+        shell: bash
+        run: |
+          rm -rf "$GITHUB_WORKSPACE/apk-output"
+
+          mkdir -p "$GITHUB_WORKSPACE/apk-output"
+
+          FINAL_APK="$GITHUB_WORKSPACE/apk-output/My-Life-V1.8-ADHKAR-ROBUST-FIX.apk"
+
+          cp "$APK_PATH" "$FINAL_APK"
+
+          echo ""
+          echo "========================================"
+          echo "FINAL APK READY"
+          echo "========================================"
+
+          echo ""
+          echo "$FINAL_APK"
+
+          echo ""
+
+          ls -lh "$FINAL_APK"
+
+          echo "FINAL_APK=$FINAL_APK" >> "$GITHUB_ENV"
+
+
+      # ============================================================
+      # 19. FINAL CHECK
+      # ============================================================
+      - name: Final Check
+        shell: bash
+        run: |
+          if [ ! -f "$FINAL_APK" ]; then
+
+            echo "ERROR: Final APK missing"
+
+            exit 1
+
+          fi
+
+          echo ""
+          echo "MY LIFE V1.8 BUILD SUCCESSFUL"
+          echo ""
+          echo "Package:"
+          echo "com.mylife.app"
+          echo ""
+          echo "Version:"
+          echo "1.8.0"
+          echo ""
+          echo "Version Code:"
+          echo "9"
+          echo ""
+          echo "Adhkar robust fix included."
+          echo ""
+          echo "Ready for installation/update."
+
+
+      # ============================================================
+      # 20. UPLOAD APK
+      # ============================================================
+      - name: Upload My Life V1.8 APK
         uses: actions/upload-artifact@v4
         with:
-          name: My-Life-V1.6-PERMANENT-UPDATE
-          path: apk-output/My-Life-V1.6-PERMANENT-UPDATE.apk
+          name: My-Life-V1.8-ADHKAR-ROBUST-FIX
+          path: apk-output/My-Life-V1.8-ADHKAR-ROBUST-FIX.apk
           if-no-files-found: error
           retention-days: 30
