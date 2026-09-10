@@ -36,7 +36,7 @@ jobs:
 
 
       # ==========================================
-      # FIND KAYAN ZIP
+      # FIND THE CORRECT KAYAN ZIP
       # ==========================================
 
       - name: Find Kayan ZIP
@@ -48,27 +48,47 @@ jobs:
           echo " KAYAN EQUINE CLINICAL ASSISTANT"
           echo "======================================"
 
-          echo "Searching for Kayan ZIP..."
+          echo ""
+          echo "Searching for Kayan project ZIP..."
+          echo ""
 
-          ZIP_FILE=$(find . -maxdepth 2 -type f \
-            \( -iname "*Kayan*Equine*Clinical*Assistant*.zip" \
-            -o -iname "*Kayan*Equine*.zip" \
-            -o -iname "*Kayan*.zip" \) \
+          ZIP_FILE=$(find . -maxdepth 3 -type f \
+            -iname "*FINAL*APK*GITHUB*.zip" \
             | head -n 1)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: Kayan ZIP file not found"
-            exit 1
+            ZIP_FILE=$(find . -maxdepth 3 -type f \
+              -iname "*Kayan*Equine*Clinical*Assistant*.zip" \
+              | head -n 1)
           fi
 
-          echo "Found:"
+          if [ -z "$ZIP_FILE" ]; then
+            ZIP_FILE=$(find . -maxdepth 3 -type f \
+              -iname "*Kayan*.zip" \
+              | head -n 1)
+          fi
+
+          if [ -z "$ZIP_FILE" ]; then
+
+            echo "ERROR: Kayan ZIP not found"
+            echo ""
+            echo "Available ZIP files:"
+            find . -type f -iname "*.zip" -print
+
+            exit 1
+
+          fi
+
+          echo ""
+          echo "Using ZIP:"
           echo "$ZIP_FILE"
+          echo ""
 
           echo "ZIP_FILE=$ZIP_FILE" >> "$GITHUB_ENV"
 
 
       # ==========================================
-      # EXTRACT PROJECT
+      # EXTRACT ZIP
       # ==========================================
 
       - name: Extract Kayan Project
@@ -77,17 +97,19 @@ jobs:
           set -e
 
           rm -rf kayan-build
-          mkdir kayan-build
+          mkdir -p kayan-build
 
           unzip -q "$ZIP_FILE" -d kayan-build
 
-          echo "ZIP extracted successfully"
+          echo ""
+          echo "ZIP extracted successfully."
+          echo ""
 
-          find kayan-build -maxdepth 4 -type f | head -100
+          find kayan-build -maxdepth 4 -type f | head -150
 
 
       # ==========================================
-      # LOCATE ANDROID PROJECT
+      # FIND ANDROID PROJECT
       # ==========================================
 
       - name: Locate Android Project
@@ -95,27 +117,121 @@ jobs:
         run: |
           set -e
 
-          SETTINGS=$(find kayan-build -type f -name "settings.gradle" | head -n 1)
+          SETTINGS=$(find kayan-build \
+            -type f \
+            -name "settings.gradle" \
+            | head -n 1)
 
           if [ -z "$SETTINGS" ]; then
-            SETTINGS=$(find kayan-build -type f -name "settings.gradle.kts" | head -n 1)
+
+            SETTINGS=$(find kayan-build \
+              -type f \
+              -name "settings.gradle.kts" \
+              | head -n 1)
+
           fi
 
           if [ -z "$SETTINGS" ]; then
-            echo "ERROR: settings.gradle not found inside ZIP"
+
+            echo "ERROR: Android settings.gradle not found"
+
             exit 1
+
           fi
 
           PROJECT_DIR=$(dirname "$SETTINGS")
 
-          echo "Android Project:"
+          echo ""
+          echo "Android project found:"
           echo "$PROJECT_DIR"
+          echo ""
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
 
       # ==========================================
-      # VERIFY PROJECT
+      # PREPARE KAYAN WEB APPLICATION
+      # ==========================================
+
+      - name: Prepare Kayan index.html
+        shell: bash
+        run: |
+          set -e
+
+          echo ""
+          echo "Searching for Kayan index.html..."
+          echo ""
+
+          mkdir -p "$PROJECT_DIR/app/src/main/assets/www"
+
+
+          # First check correct Android location
+
+          if [ -f "$PROJECT_DIR/app/src/main/assets/www/index.html" ]; then
+
+            echo "Kayan index.html already in correct location."
+
+          else
+
+            echo "index.html not in Android assets."
+            echo "Searching extracted project..."
+
+
+            INDEX_FILE=$(find kayan-build \
+              -type f \
+              -iname "index.html" \
+              | head -n 1)
+
+
+            # Search repository if not inside ZIP
+
+            if [ -z "$INDEX_FILE" ]; then
+
+              INDEX_FILE=$(find . \
+                -type f \
+                -iname "index.html" \
+                ! -path "./kayan-build/*" \
+                | head -n 1)
+
+            fi
+
+
+            if [ -z "$INDEX_FILE" ]; then
+
+              echo ""
+              echo "ERROR: No index.html found."
+              echo ""
+
+              exit 1
+
+            fi
+
+
+            echo ""
+            echo "Found index.html:"
+            echo "$INDEX_FILE"
+            echo ""
+
+
+            cp "$INDEX_FILE" \
+              "$PROJECT_DIR/app/src/main/assets/www/index.html"
+
+
+            echo "index.html copied successfully."
+
+          fi
+
+
+          echo ""
+          echo "Checking final file:"
+          echo ""
+
+          ls -lh \
+            "$PROJECT_DIR/app/src/main/assets/www/index.html"
+
+
+      # ==========================================
+      # VERIFY KAYAN APP
       # ==========================================
 
       - name: Verify Kayan Android Project
@@ -125,34 +241,54 @@ jobs:
 
           cd "$PROJECT_DIR"
 
-          echo "Project files:"
+          echo ""
+          echo "======================================"
+          echo " VERIFY KAYAN ANDROID PROJECT"
+          echo "======================================"
+
           ls -la
 
+
           if [ ! -d "app" ]; then
-            echo "ERROR: app folder not found"
+
+            echo "ERROR: app folder missing"
             exit 1
+
           fi
 
-          if [ ! -f "app/build.gradle" ] && [ ! -f "app/build.gradle.kts" ]; then
-            echo "ERROR: app/build.gradle not found"
+
+          if [ ! -f "app/build.gradle" ] && \
+             [ ! -f "app/build.gradle.kts" ]; then
+
+            echo "ERROR: app/build.gradle missing"
             exit 1
+
           fi
+
 
           if [ ! -f "app/src/main/AndroidManifest.xml" ]; then
-            echo "ERROR: AndroidManifest.xml not found"
+
+            echo "ERROR: AndroidManifest.xml missing"
             exit 1
+
           fi
+
 
           if [ ! -f "app/src/main/assets/www/index.html" ]; then
-            echo "ERROR: Kayan index.html not found"
+
+            echo "ERROR: index.html missing"
             exit 1
+
           fi
 
-          echo "Kayan Android project verified successfully"
+
+          echo ""
+          echo "Kayan Android project verified."
+          echo ""
 
 
       # ==========================================
-      # REMOVE BROKEN GRADLE WRAPPER
+      # DISABLE OLD / BROKEN GRADLE WRAPPER
       # ==========================================
 
       - name: Disable Broken Gradle Wrapper
@@ -163,12 +299,11 @@ jobs:
           rm -f gradlew
           rm -f gradlew.bat
 
-          echo "Local Gradle wrapper disabled"
-          echo "GitHub Gradle 8.9 will be used"
+          echo "Using GitHub Gradle 8.9"
 
 
       # ==========================================
-      # CHECK GRADLE
+      # SHOW GRADLE VERSION
       # ==========================================
 
       - name: Check Gradle
@@ -181,26 +316,26 @@ jobs:
       # BUILD APK
       # ==========================================
 
-      - name: Build APK
+      - name: Build Kayan APK
         shell: bash
         run: |
           set -e
 
           cd "$PROJECT_DIR"
 
+          echo ""
           echo "======================================"
           echo " BUILDING KAYAN EQUINE APK"
           echo "======================================"
+          echo ""
 
           gradle clean assembleDebug \
             --no-daemon \
             --stacktrace
 
-          echo "Build completed"
-
 
       # ==========================================
-      # FIND GENERATED APK
+      # FIND APK
       # ==========================================
 
       - name: Find Generated APK
@@ -208,43 +343,65 @@ jobs:
         run: |
           set -e
 
-          APK_FILE=$(find "$PROJECT_DIR/app/build/outputs/apk" \
+          echo ""
+          echo "Searching generated APK..."
+          echo ""
+
+
+          APK_FILE=$(find "$PROJECT_DIR" \
             -type f \
+            -path "*/build/outputs/apk/*" \
             -name "*.apk" \
             | head -n 1)
 
+
           if [ -z "$APK_FILE" ]; then
 
-            echo "ERROR: APK not generated"
+            echo ""
+            echo "ERROR: APK was not generated."
+            echo ""
 
-            find "$PROJECT_DIR/app/build" -type f || true
+            find "$PROJECT_DIR" \
+              -type f \
+              -name "*.apk" \
+              -print || true
 
             exit 1
 
           fi
 
+
+          echo ""
           echo "APK found:"
           echo "$APK_FILE"
+          echo ""
+
 
           mkdir -p final-apk
 
+
           cp "$APK_FILE" \
             final-apk/Kayan-Equine-Clinical-Assistant.apk
+
 
           echo ""
           echo "======================================"
           echo " KAYAN EQUINE APK READY"
           echo "======================================"
+          echo ""
 
-          ls -lh final-apk/Kayan-Equine-Clinical-Assistant.apk
+
+          ls -lh \
+            final-apk/Kayan-Equine-Clinical-Assistant.apk
 
 
       # ==========================================
-      # UPLOAD APK
+      # UPLOAD INSTALLABLE APK
       # ==========================================
 
       - name: Upload Kayan APK
         uses: actions/upload-artifact@v4
+
         with:
 
           name: Kayan-Equine-Clinical-Assistant-APK
