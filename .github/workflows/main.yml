@@ -1,4 +1,4 @@
-name: Build Kayan Equine Clinical Assistant APK
+name: Build Kayan Equine APK
 
 on:
   workflow_dispatch:
@@ -11,182 +11,195 @@ permissions:
   contents: read
 
 jobs:
-
   build:
-
     name: Build Kayan Equine APK
-
     runs-on: ubuntu-latest
 
     steps:
 
-      # ==============================
-      # 1. Download project
-      # ==============================
-
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-
-      # ==============================
-      # 2. Install Java 17
-      # ==============================
-
       - name: Setup Java 17
         uses: actions/setup-java@v4
-
         with:
           distribution: temurin
           java-version: "17"
 
-
-      # ==============================
-      # 3. Setup Gradle
-      # ==============================
-
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
-
         with:
           gradle-version: "8.9"
 
+      # ==========================================
+      # FIND AND EXTRACT KAYAN ZIP AUTOMATICALLY
+      # ==========================================
 
-      # ==============================
-      # 4. Check Android project
-      # ==============================
-
-      - name: Verify Kayan Project
+      - name: Find and Extract Kayan Project
         shell: bash
-
         run: |
+          set -e
 
-          echo "=========================================="
+          echo "======================================"
           echo " KAYAN EQUINE CLINICAL ASSISTANT"
-          echo " Android APK Build"
-          echo "=========================================="
+          echo " Automatic ZIP Extraction"
+          echo "======================================"
 
           echo ""
-          echo "Checking project files..."
+          echo "ZIP files found:"
+          find . -maxdepth 2 -type f -iname "*.zip" -print || true
+
+          ZIP_FILE=$(find . -maxdepth 2 -type f \
+            \( -iname "*Kayan*Equine*Clinical*Assistant*.zip" \
+            -o -iname "*Kayan*Equine*.zip" \
+            -o -iname "*Kayan*.zip" \) \
+            | head -n 1)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo ""
+            echo "ERROR: Kayan ZIP file not found."
+            echo "Upload the Kayan Android project ZIP to the repository."
+            exit 1
+          fi
+
           echo ""
+          echo "Kayan ZIP found:"
+          echo "$ZIP_FILE"
+
+          rm -rf kayan-build
+          mkdir -p kayan-build
+
+          unzip -q "$ZIP_FILE" -d kayan-build
+
+          echo ""
+          echo "ZIP extracted successfully."
+          echo ""
+
+          find kayan-build -maxdepth 3 -type f | head -100
+
+      # ==========================================
+      # FIND ANDROID PROJECT INSIDE EXTRACTED ZIP
+      # ==========================================
+
+      - name: Locate Android Project
+        shell: bash
+        run: |
+          set -e
+
+          SETTINGS=$(find kayan-build -type f -name "settings.gradle" | head -n 1)
+
+          if [ -z "$SETTINGS" ]; then
+            SETTINGS=$(find kayan-build -type f -name "settings.gradle.kts" | head -n 1)
+          fi
+
+          if [ -z "$SETTINGS" ]; then
+            echo "ERROR: Android settings.gradle not found inside ZIP."
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$SETTINGS")
+
+          echo "Android project found:"
+          echo "$PROJECT_DIR"
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      # ==========================================
+      # VERIFY PROJECT
+      # ==========================================
+
+      - name: Verify Kayan Android Project
+        shell: bash
+        run: |
+          set -e
+
+          cd "$PROJECT_DIR"
+
+          echo "======================================"
+          echo " Android project contents"
+          echo "======================================"
 
           ls -la
 
-          if [ ! -f "settings.gradle" ]; then
-            echo "ERROR: settings.gradle not found"
+          if [ ! -d "app" ]; then
+            echo "ERROR: app folder not found."
             exit 1
           fi
 
-          if [ ! -f "build.gradle" ]; then
-            echo "ERROR: build.gradle not found"
-            exit 1
-          fi
-
-          if [ ! -f "app/build.gradle" ]; then
-            echo "ERROR: app/build.gradle not found"
+          if [ ! -f "app/build.gradle" ] && [ ! -f "app/build.gradle.kts" ]; then
+            echo "ERROR: app/build.gradle not found."
             exit 1
           fi
 
           if [ ! -f "app/src/main/AndroidManifest.xml" ]; then
-            echo "ERROR: AndroidManifest.xml not found"
-            exit 1
-          fi
-
-          if [ ! -f "app/src/main/assets/www/index.html" ]; then
-            echo "ERROR: Kayan application index.html not found"
+            echo "ERROR: AndroidManifest.xml not found."
             exit 1
           fi
 
           echo ""
-          echo "All required Kayan files found."
-          echo ""
+          echo "Kayan Android project verified successfully."
 
+      # ==========================================
+      # BUILD APK
+      # ==========================================
 
-      # ==============================
-      # 5. Clean project
-      # ==============================
-
-      - name: Clean Android Project
-        run: |
-
-          gradle clean
-
-
-      # ==============================
-      # 6. Build APK
-      # ==============================
-
-      - name: Build Kayan APK
-        run: |
-
-          gradle assembleDebug --stacktrace
-
-
-      # ==============================
-      # 7. Check generated APK
-      # ==============================
-
-      - name: Verify Generated APK
+      - name: Build APK
         shell: bash
-
         run: |
+          set -e
 
-          echo ""
-          echo "Searching for generated APK..."
-          echo ""
+          cd "$PROJECT_DIR"
 
-          find app/build/outputs -type f -name "*.apk" -print
+          echo "Building Kayan Equine Clinical Assistant..."
 
-          if [ ! -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            ./gradlew clean assembleDebug --stacktrace
+          else
+            gradle clean assembleDebug --stacktrace
+          fi
 
-            echo ""
+      # ==========================================
+      # FIND APK AUTOMATICALLY
+      # ==========================================
+
+      - name: Find Generated APK
+        shell: bash
+        run: |
+          set -e
+
+          APK_FILE=$(find "$PROJECT_DIR/app/build/outputs/apk" \
+            -type f -name "*.apk" | head -n 1)
+
+          if [ -z "$APK_FILE" ]; then
             echo "ERROR: APK was not generated."
-            echo ""
-
             exit 1
-
           fi
 
           echo ""
-          echo "APK generated successfully."
-          echo ""
+          echo "APK FOUND:"
+          echo "$APK_FILE"
 
+          mkdir -p final-apk
 
-      # ==============================
-      # 8. Rename final APK
-      # ==============================
-
-      - name: Prepare Final Kayan APK
-        shell: bash
-
-        run: |
-
-          mkdir -p apk-output
-
-          cp app/build/outputs/apk/debug/app-debug.apk \
-          apk-output/Kayan-Equine-Clinical-Assistant.apk
+          cp "$APK_FILE" \
+          final-apk/Kayan-Equine-Clinical-Assistant.apk
 
           echo ""
-          echo "=========================================="
-          echo " KAYAN EQUINE CLINICAL ASSISTANT"
-          echo " APK READY"
-          echo "=========================================="
+          echo "======================================"
+          echo " KAYAN APK READY"
+          echo "======================================"
 
-          ls -lh apk-output/Kayan-Equine-Clinical-Assistant.apk
+          ls -lh final-apk/Kayan-Equine-Clinical-Assistant.apk
 
-
-      # ==============================
-      # 9. Upload APK
-      # ==============================
+      # ==========================================
+      # UPLOAD APK
+      # ==========================================
 
       - name: Upload Kayan APK
         uses: actions/upload-artifact@v4
-
         with:
-
           name: Kayan-Equine-Clinical-Assistant-APK
-
-          path: apk-output/Kayan-Equine-Clinical-Assistant.apk
-
+          path: final-apk/Kayan-Equine-Clinical-Assistant.apk
           if-no-files-found: error
-
           retention-days: 30
