@@ -1,4 +1,4 @@
-name: Deploy Kayan Equine Clinical Assistant
+name: Build Kayan Equine Clinical Assistant APK
 
 on:
   workflow_dispatch:
@@ -9,69 +9,184 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
 
 jobs:
 
   build:
-    name: Build Kayan Equine Clinical Assistant
+
+    name: Build Kayan Equine APK
+
     runs-on: ubuntu-latest
 
     steps:
+
+      # ==============================
+      # 1. Download project
+      # ==============================
 
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Verify Required Files
-        shell: bash
-        run: |
-          echo "Checking Kayan Equine Clinical Assistant files..."
 
-          if [ ! -f "index.html" ]; then
-            echo "ERROR: index.html not found"
+      # ==============================
+      # 2. Install Java 17
+      # ==============================
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+
+        with:
+          distribution: temurin
+          java-version: "17"
+
+
+      # ==============================
+      # 3. Setup Gradle
+      # ==============================
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+        with:
+          gradle-version: "8.9"
+
+
+      # ==============================
+      # 4. Check Android project
+      # ==============================
+
+      - name: Verify Kayan Project
+        shell: bash
+
+        run: |
+
+          echo "=========================================="
+          echo " KAYAN EQUINE CLINICAL ASSISTANT"
+          echo " Android APK Build"
+          echo "=========================================="
+
+          echo ""
+          echo "Checking project files..."
+          echo ""
+
+          ls -la
+
+          if [ ! -f "settings.gradle" ]; then
+            echo "ERROR: settings.gradle not found"
             exit 1
           fi
 
-          echo "index.html found"
-
-          if [ -f "manifest.webmanifest" ]; then
-            echo "manifest.webmanifest found"
-          else
-            echo "WARNING: manifest.webmanifest not found"
+          if [ ! -f "build.gradle" ]; then
+            echo "ERROR: build.gradle not found"
+            exit 1
           fi
 
-          if [ -f "service-worker.js" ]; then
-            echo "service-worker.js found"
-          else
-            echo "WARNING: service-worker.js not found"
+          if [ ! -f "app/build.gradle" ]; then
+            echo "ERROR: app/build.gradle not found"
+            exit 1
           fi
 
-          echo "Kayan Equine Clinical Assistant verification completed"
+          if [ ! -f "app/src/main/AndroidManifest.xml" ]; then
+            echo "ERROR: AndroidManifest.xml not found"
+            exit 1
+          fi
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
+          if [ ! -f "app/src/main/assets/www/index.html" ]; then
+            echo "ERROR: Kayan application index.html not found"
+            exit 1
+          fi
 
-      - name: Upload Kayan Web App
-        uses: actions/upload-pages-artifact@v3
+          echo ""
+          echo "All required Kayan files found."
+          echo ""
+
+
+      # ==============================
+      # 5. Clean project
+      # ==============================
+
+      - name: Clean Android Project
+        run: |
+
+          gradle clean
+
+
+      # ==============================
+      # 6. Build APK
+      # ==============================
+
+      - name: Build Kayan APK
+        run: |
+
+          gradle assembleDebug --stacktrace
+
+
+      # ==============================
+      # 7. Check generated APK
+      # ==============================
+
+      - name: Verify Generated APK
+        shell: bash
+
+        run: |
+
+          echo ""
+          echo "Searching for generated APK..."
+          echo ""
+
+          find app/build/outputs -type f -name "*.apk" -print
+
+          if [ ! -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
+
+            echo ""
+            echo "ERROR: APK was not generated."
+            echo ""
+
+            exit 1
+
+          fi
+
+          echo ""
+          echo "APK generated successfully."
+          echo ""
+
+
+      # ==============================
+      # 8. Rename final APK
+      # ==============================
+
+      - name: Prepare Final Kayan APK
+        shell: bash
+
+        run: |
+
+          mkdir -p apk-output
+
+          cp app/build/outputs/apk/debug/app-debug.apk \
+          apk-output/Kayan-Equine-Clinical-Assistant.apk
+
+          echo ""
+          echo "=========================================="
+          echo " KAYAN EQUINE CLINICAL ASSISTANT"
+          echo " APK READY"
+          echo "=========================================="
+
+          ls -lh apk-output/Kayan-Equine-Clinical-Assistant.apk
+
+
+      # ==============================
+      # 9. Upload APK
+      # ==============================
+
+      - name: Upload Kayan APK
+        uses: actions/upload-artifact@v4
+
         with:
-          path: "."
 
-  deploy:
-    name: Deploy Kayan Equine App
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+          name: Kayan-Equine-Clinical-Assistant-APK
 
-    runs-on: ubuntu-latest
-    needs: build
+          path: apk-output/Kayan-Equine-Clinical-Assistant.apk
 
-    steps:
+          if-no-files-found: error
 
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          retention-days: 30
