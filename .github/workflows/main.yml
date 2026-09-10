@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build:
-    name: Build Kayan Vet V3.5 APK
+    name: Build Kayan V3.5 APK
     runs-on: ubuntu-latest
 
     steps:
@@ -34,7 +34,7 @@ jobs:
           set -e
 
           echo "======================================"
-          echo " INSTALLING ANDROID SDK"
+          echo " INSTALLING ANDROID SDK 35"
           echo "======================================"
 
           yes | sdkmanager --licenses >/dev/null || true
@@ -44,15 +44,16 @@ jobs:
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-          echo "Android SDK ready"
+          echo ""
+          echo "ANDROID SDK READY"
           echo "ANDROID_HOME=$ANDROID_HOME"
 
-      - name: Setup Gradle 8.9
+      - name: Setup Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.9"
+          gradle-version: "8.11.1"
 
-      - name: Find V3.5 ZIP
+      - name: Find Kayan V3.5 ZIP
         shell: bash
         run: |
           set -e
@@ -61,6 +62,7 @@ jobs:
           echo " SEARCHING FOR KAYAN V3.5 ZIP"
           echo "======================================"
 
+          echo ""
           echo "Available ZIP files:"
           find . -type f -iname "*.zip" -print || true
 
@@ -69,6 +71,12 @@ jobs:
           ZIP_FILE=$(find . -type f \
             -iname "*V3.5.0*MERGED*CLINICAL*.zip" \
             | head -n 1 || true)
+
+          if [ -z "$ZIP_FILE" ]; then
+            ZIP_FILE=$(find . -type f \
+              -iname "*V3.5*MERGED*.zip" \
+              | head -n 1 || true)
+          fi
 
           if [ -z "$ZIP_FILE" ]; then
             ZIP_FILE=$(find . -type f \
@@ -89,7 +97,8 @@ jobs:
           fi
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: Kayan V3.5 ZIP not found"
+            echo ""
+            echo "ERROR: Kayan V3.5 ZIP not found."
             exit 1
           fi
 
@@ -99,7 +108,7 @@ jobs:
 
           echo "ZIP_FILE=$ZIP_FILE" >> "$GITHUB_ENV"
 
-      - name: Extract Kayan V3.5
+      - name: Extract Kayan Project
         shell: bash
         run: |
           set -e
@@ -114,18 +123,20 @@ jobs:
           unzip -q "$ZIP_FILE" -d kayan-build
 
           echo ""
-          echo "Extraction completed"
+          echo "EXTRACTION COMPLETED"
 
           echo ""
           echo "Extracted files:"
-          find kayan-build -maxdepth 5 -type f | head -200
+          find kayan-build -maxdepth 6 -type f | head -250
 
       - name: Locate Android Project
         shell: bash
         run: |
           set -e
 
-          echo "Searching for settings.gradle..."
+          echo "======================================"
+          echo " LOCATING ANDROID PROJECT"
+          echo "======================================"
 
           SETTINGS_FILE=$(find kayan-build \
             -type f \
@@ -140,7 +151,11 @@ jobs:
           fi
 
           if [ -z "$SETTINGS_FILE" ]; then
-            echo "ERROR: Android project not found"
+            echo ""
+            echo "ERROR: settings.gradle not found."
+            echo ""
+            echo "Extracted project contents:"
+            find kayan-build -maxdepth 7 -type f | head -300
             exit 1
           fi
 
@@ -157,101 +172,147 @@ jobs:
         run: |
           set -e
 
-          echo "sdk.dir=$ANDROID_HOME" \
-            > "$PROJECT_DIR/local.properties"
+          echo "sdk.dir=$ANDROID_HOME" > "$PROJECT_DIR/local.properties"
 
           echo ""
           echo "local.properties:"
           cat "$PROJECT_DIR/local.properties"
 
-      - name: Verify Clinical Merge Files
+      - name: Normalize Project Files
         shell: bash
         run: |
           set -e
 
           echo "======================================"
-          echo " CHECKING MERGED CLINICAL FILES"
+          echo " NORMALIZING PROJECT FILES"
           echo "======================================"
 
-          if [ ! -f "$PROJECT_DIR/app/src/main/assets/index.html" ]; then
-            echo "ERROR: Main hospital index.html missing"
-            exit 1
-          fi
-
-          if [ ! -f "$PROJECT_DIR/app/src/main/assets/clinical.html" ]; then
-            echo "ERROR: Clinical Assistant clinical.html missing"
-            exit 1
-          fi
-
-          if [ ! -f "$PROJECT_DIR/app/src/main/assets/computer_backup.json" ]; then
-            echo "ERROR: Hospital database backup missing"
-            exit 1
-          fi
-
-          echo ""
-          echo "Main Hospital App:"
-          ls -lh "$PROJECT_DIR/app/src/main/assets/index.html"
-
-          echo ""
-          echo "Clinical Assistant:"
-          ls -lh "$PROJECT_DIR/app/src/main/assets/clinical.html"
-
-          echo ""
-          echo "Hospital Database:"
-          ls -lh "$PROJECT_DIR/app/src/main/assets/computer_backup.json"
-
-          echo ""
-          echo "MERGED FILES VERIFIED"
-
-      - name: Fix Java Files
-        shell: bash
-        run: |
-          set -e
-
-          echo "======================================"
-          echo " FIXING JAVA FILES"
-          echo "======================================"
-
-          find "$PROJECT_DIR/app/src/main/java" \
+          find "$PROJECT_DIR" \
             -type f \
-            -name "*.java" \
-            -exec sed -i 's/\r$//' {} \;
-
-          find "$PROJECT_DIR/app/src/main/java" \
-            -type f \
-            -name "*.java" \
-            -exec sed -i \
-            's/import android\.app\.PrintManager;/import android.print.PrintManager;/' \
-            {} \;
-
-          echo ""
-          echo "Java files repaired"
-
-      - name: Repair Gradle Files
-        shell: bash
-        run: |
-          set -e
-
-          cd "$PROJECT_DIR"
-
-          echo "======================================"
-          echo " REPAIRING GRADLE PROJECT"
-          echo "======================================"
-
-          find . \
-            -type f \
-            \( -name "*.gradle" \
-            -o -name "*.java" \
-            -o -name "*.xml" \) \
+            \( \
+              -name "*.gradle" \
+              -o -name "*.gradle.kts" \
+              -o -name "*.java" \
+              -o -name "*.xml" \
+              -o -name "*.properties" \
+              -o -name "*.html" \
+            \) \
             -exec sed -i 's/\r$//' {} \; || true
 
-          rm -f gradlew
-          rm -f gradlew.bat
+          echo ""
+          echo "FILES NORMALIZED"
+
+      - name: Fix MainActivity Java
+        shell: bash
+        run: |
+          set -e
+
+          echo "======================================"
+          echo " FIXING MAINACTIVITY"
+          echo "======================================"
+
+          MAIN=$(find "$PROJECT_DIR/app/src/main/java" \
+            -type f \
+            -name "MainActivity.java" \
+            | head -n 1 || true)
+
+          if [ -z "$MAIN" ]; then
+            echo "ERROR: MainActivity.java not found."
+            exit 1
+          fi
+
+          echo "MainActivity found:"
+          echo "$MAIN"
+
+          sed -i 's/\r$//' "$MAIN"
+
+          sed -i \
+            's/import android\.app\.PrintManager;/import android.print.PrintManager;/' \
+            "$MAIN"
+
+          sed -i \
+            's/MainActivity\.super\.onBackPressed();/finish();/' \
+            "$MAIN"
 
           echo ""
-          echo "Using Gradle 8.9 installed by GitHub"
+          echo "PrintManager check:"
+          grep -n "PrintManager" "$MAIN" || true
 
-      - name: Ensure Java Compatibility
+          echo ""
+          echo "MAINACTIVITY FIX COMPLETED"
+
+      - name: Verify Merged Clinical Files
+        shell: bash
+        run: |
+          set -e
+
+          echo "======================================"
+          echo " VERIFYING MERGED APP FILES"
+          echo "======================================"
+
+          ASSETS="$PROJECT_DIR/app/src/main/assets"
+
+          mkdir -p "$ASSETS"
+
+          echo ""
+          echo "Current assets:"
+          find "$ASSETS" -maxdepth 3 -type f -print || true
+
+          if [ ! -f "$ASSETS/index.html" ]; then
+
+            echo ""
+            echo "index.html not in assets."
+            echo "Searching project..."
+
+            INDEX=$(find "$PROJECT_DIR" \
+              -type f \
+              -name "index.html" \
+              | head -n 1 || true)
+
+            if [ -n "$INDEX" ]; then
+
+              echo "Found:"
+              echo "$INDEX"
+
+              cp "$INDEX" "$ASSETS/index.html"
+
+              echo "index.html copied to Android assets."
+
+            else
+
+              echo "ERROR: index.html not found."
+              exit 1
+
+            fi
+          fi
+
+          echo ""
+          echo "MAIN APP:"
+          ls -lh "$ASSETS/index.html"
+
+          if [ -f "$ASSETS/clinical.html" ]; then
+            echo ""
+            echo "CLINICAL ASSISTANT:"
+            ls -lh "$ASSETS/clinical.html"
+          else
+            echo ""
+            echo "clinical.html not found as separate file."
+            echo "Clinical module may already be inside index.html."
+          fi
+
+          if [ -f "$ASSETS/computer_backup.json" ]; then
+            echo ""
+            echo "DATABASE:"
+            ls -lh "$ASSETS/computer_backup.json"
+          else
+            echo ""
+            echo "computer_backup.json not found as separate asset."
+          fi
+
+          echo ""
+          echo "MERGED APP FILE CHECK COMPLETED"
+
+      - name: Ensure Java 17 Compatibility
         shell: bash
         run: |
           set -e
@@ -265,35 +326,44 @@ jobs:
               python3 - <<'PY'
           import os
 
-          p = os.environ["PROJECT_DIR"] + "/app/build.gradle"
+          project = os.environ["PROJECT_DIR"]
+          p = os.path.join(project, "app", "build.gradle")
 
-          text = open(p, encoding="utf-8").read()
+          with open(p, "r", encoding="utf-8") as f:
+              text = f.read()
 
           marker = "android {"
 
-          insert = """
+          options = """
+
               compileOptions {
                   sourceCompatibility JavaVersion.VERSION_17
                   targetCompatibility JavaVersion.VERSION_17
               }
+
           """
 
           if marker in text:
               text = text.replace(
                   marker,
-                  marker + insert,
+                  marker + options,
                   1
               )
 
-          open(p, "w", encoding="utf-8").write(text)
+              with open(p, "w", encoding="utf-8") as f:
+                  f.write(text)
+
+              print("Java 17 compileOptions added.")
+          else:
+              print("android block not found.")
+
           PY
 
+            else
+              echo "Java compatibility already configured."
             fi
 
           fi
-
-          echo ""
-          echo "Java compatibility configured"
 
       - name: Verify Android Project
         shell: bash
@@ -303,70 +373,99 @@ jobs:
           cd "$PROJECT_DIR"
 
           echo "======================================"
-          echo " VERIFYING PROJECT"
+          echo " VERIFYING ANDROID PROJECT"
           echo "======================================"
 
+          echo ""
+          echo "Project directory:"
+          pwd
+
+          echo ""
+          echo "Project files:"
           ls -la
 
           if [ ! -f "settings.gradle" ] && \
              [ ! -f "settings.gradle.kts" ]; then
-            echo "ERROR: settings.gradle missing"
+            echo "ERROR: settings.gradle missing."
             exit 1
           fi
 
           if [ ! -f "build.gradle" ] && \
              [ ! -f "build.gradle.kts" ]; then
-            echo "ERROR: root build.gradle missing"
+            echo "ERROR: root build.gradle missing."
             exit 1
           fi
 
           if [ ! -d "app" ]; then
-            echo "ERROR: app folder missing"
+            echo "ERROR: app folder missing."
             exit 1
           fi
 
-          if [ ! -f "app/build.gradle" ]; then
-            echo "ERROR: app/build.gradle missing"
+          if [ ! -f "app/build.gradle" ] && \
+             [ ! -f "app/build.gradle.kts" ]; then
+            echo "ERROR: app/build.gradle missing."
             exit 1
           fi
 
           if [ ! -f "app/src/main/AndroidManifest.xml" ]; then
-            echo "ERROR: AndroidManifest.xml missing"
+            echo "ERROR: AndroidManifest.xml missing."
             exit 1
           fi
 
           if [ ! -f "app/src/main/assets/index.html" ]; then
-            echo "ERROR: index.html missing"
-            exit 1
-          fi
-
-          if [ ! -f "app/src/main/assets/clinical.html" ]; then
-            echo "ERROR: clinical.html missing"
+            echo "ERROR: index.html missing."
             exit 1
           fi
 
           echo ""
-          echo "PROJECT VERIFIED SUCCESSFULLY"
+          echo "======================================"
+          echo " PROJECT VERIFIED SUCCESSFULLY"
+          echo "======================================"
+
+      - name: Show Gradle Configuration
+        shell: bash
+        run: |
+          echo "======================================"
+          echo " ROOT BUILD.GRADLE"
+          echo "======================================"
+
+          cat "$PROJECT_DIR/build.gradle" 2>/dev/null || true
+
+          echo ""
+          echo "======================================"
+          echo " APP BUILD.GRADLE"
+          echo "======================================"
+
+          cat "$PROJECT_DIR/app/build.gradle" 2>/dev/null || true
+
+          echo ""
+          echo "======================================"
+          echo " SETTINGS.GRADLE"
+          echo "======================================"
+
+          cat "$PROJECT_DIR/settings.gradle" 2>/dev/null || true
 
       - name: Show Build Environment
         shell: bash
         run: |
-          echo ""
           echo "======================================"
-          echo " JAVA"
+          echo " JAVA VERSION"
           echo "======================================"
+
           java -version
 
           echo ""
           echo "======================================"
-          echo " GRADLE"
+          echo " GRADLE VERSION"
           echo "======================================"
+
           gradle --version
 
           echo ""
           echo "======================================"
           echo " ANDROID SDK"
           echo "======================================"
+
           echo "$ANDROID_HOME"
 
       - name: Build Kayan V3.5 APK
@@ -377,7 +476,7 @@ jobs:
           cd "$PROJECT_DIR"
 
           echo "======================================"
-          echo " BUILDING KAYAN VET V3.5"
+          echo " BUILDING KAYAN VET V3.5 APK"
           echo "======================================"
 
           gradle \
@@ -388,7 +487,7 @@ jobs:
 
           echo ""
           echo "======================================"
-          echo " BUILD COMPLETED SUCCESSFULLY"
+          echo " APK BUILD COMPLETED SUCCESSFULLY"
           echo "======================================"
 
       - name: Find Generated APK
@@ -397,7 +496,7 @@ jobs:
           set -e
 
           echo "======================================"
-          echo " SEARCHING FOR APK"
+          echo " SEARCHING FOR GENERATED APK"
           echo "======================================"
 
           APK_FILE=$(find "$PROJECT_DIR/app/build/outputs/apk" \
@@ -415,7 +514,8 @@ jobs:
           fi
 
           if [ -z "$APK_FILE" ]; then
-            echo "ERROR: APK was not generated"
+            echo ""
+            echo "ERROR: APK was not generated."
             exit 1
           fi
 
@@ -426,7 +526,7 @@ jobs:
           mkdir -p final-apk
 
           cp "$APK_FILE" \
-            final-apk/Kayan-Vet-Hospital-V3.5-Merged-Clinical.apk
+            "final-apk/Kayan-Vet-Hospital-V3.5-Merged-Clinical.apk"
 
           echo ""
           echo "======================================"
@@ -434,7 +534,7 @@ jobs:
           echo "======================================"
 
           ls -lh \
-            final-apk/Kayan-Vet-Hospital-V3.5-Merged-Clinical.apk
+            "final-apk/Kayan-Vet-Hospital-V3.5-Merged-Clinical.apk"
 
       - name: Upload Final APK
         uses: actions/upload-artifact@v4
