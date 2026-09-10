@@ -1,4 +1,4 @@
-name: Build Kayan Equine APK
+name: Build Kayan Vet V3.5 APK
 
 on:
   workflow_dispatch:
@@ -10,25 +10,14 @@ permissions:
   contents: read
 
 jobs:
-
   build:
-
-    name: Build Kayan Equine APK
+    name: Build Kayan Vet V3.5 APK
     runs-on: ubuntu-latest
 
     steps:
 
-      # ==========================================
-      # 1. CHECKOUT REPOSITORY
-      # ==========================================
-
       - name: Checkout Repository
         uses: actions/checkout@v4
-
-
-      # ==========================================
-      # 2. SETUP JAVA 17
-      # ==========================================
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -36,14 +25,8 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-
-      # ==========================================
-      # 3. SETUP ANDROID SDK
-      # ==========================================
-
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-
 
       - name: Install Android SDK 35
         shell: bash
@@ -61,35 +44,22 @@ jobs:
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-          echo ""
           echo "Android SDK ready"
           echo "ANDROID_HOME=$ANDROID_HOME"
-
-
-      # ==========================================
-      # 4. SETUP GRADLE
-      # ==========================================
 
       - name: Setup Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
 
-
-      # ==========================================
-      # 5. FIND KAYAN ZIP
-      # ==========================================
-
-      - name: Find Kayan ZIP
+      - name: Find V3.5 ZIP
         shell: bash
         run: |
           set -e
 
-          echo ""
           echo "======================================"
-          echo " SEARCHING FOR KAYAN ZIP"
+          echo " SEARCHING FOR KAYAN V3.5 ZIP"
           echo "======================================"
-          echo ""
 
           echo "Available ZIP files:"
           find . -type f -iname "*.zip" -print || true
@@ -97,56 +67,43 @@ jobs:
           ZIP_FILE=""
 
           ZIP_FILE=$(find . -type f \
-            -iname "*Kayan*Equine*Clinical*Assistant*FIXED*.zip" \
+            -iname "*V3.5.0*MERGED*CLINICAL*.zip" \
             | head -n 1 || true)
 
           if [ -z "$ZIP_FILE" ]; then
             ZIP_FILE=$(find . -type f \
-              -iname "*Kayan*Equine*Clinical*Assistant*CLEAN*.zip" \
+              -iname "*V3.5*.zip" \
               | head -n 1 || true)
           fi
 
           if [ -z "$ZIP_FILE" ]; then
             ZIP_FILE=$(find . -type f \
-              -iname "*Kayan*Equine*Clinical*Assistant*FINAL*.zip" \
+              -iname "*MERGED*CLINICAL*.zip" \
               | head -n 1 || true)
           fi
 
           if [ -z "$ZIP_FILE" ]; then
             ZIP_FILE=$(find . -type f \
-              -iname "*Kayan*Equine*Clinical*Assistant*.zip" \
+              -iname "*KayanVetAndroid*.zip" \
               | head -n 1 || true)
           fi
 
           if [ -z "$ZIP_FILE" ]; then
-            ZIP_FILE=$(find . -type f \
-              -iname "*Kayan*.zip" \
-              | head -n 1 || true)
-          fi
-
-          if [ -z "$ZIP_FILE" ]; then
-            echo ""
-            echo "ERROR: Kayan ZIP not found"
+            echo "ERROR: Kayan V3.5 ZIP not found"
             exit 1
           fi
 
           echo ""
-          echo "Kayan ZIP FOUND:"
+          echo "ZIP FOUND:"
           echo "$ZIP_FILE"
 
           echo "ZIP_FILE=$ZIP_FILE" >> "$GITHUB_ENV"
 
-
-      # ==========================================
-      # 6. EXTRACT PROJECT
-      # ==========================================
-
-      - name: Extract Kayan Project
+      - name: Extract Kayan V3.5
         shell: bash
         run: |
           set -e
 
-          echo ""
           echo "======================================"
           echo " EXTRACTING KAYAN PROJECT"
           echo "======================================"
@@ -163,17 +120,11 @@ jobs:
           echo "Extracted files:"
           find kayan-build -maxdepth 5 -type f | head -200
 
-
-      # ==========================================
-      # 7. LOCATE ANDROID PROJECT
-      # ==========================================
-
       - name: Locate Android Project
         shell: bash
         run: |
           set -e
 
-          echo ""
           echo "Searching for settings.gradle..."
 
           SETTINGS_FILE=$(find kayan-build \
@@ -201,68 +152,6 @@ jobs:
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-
-      # ==========================================
-      # 8. PREPARE INDEX.HTML
-      # ==========================================
-
-      - name: Prepare Kayan index.html
-        shell: bash
-        run: |
-          set -e
-
-          TARGET_DIR="$PROJECT_DIR/app/src/main/assets/www"
-
-          mkdir -p "$TARGET_DIR"
-
-          if [ -f "$TARGET_DIR/index.html" ]; then
-
-            echo ""
-            echo "index.html already exists"
-
-          else
-
-            echo ""
-            echo "Searching for index.html..."
-
-            INDEX_FILE=$(find kayan-build \
-              -type f \
-              -iname "index.html" \
-              | head -n 1 || true)
-
-            if [ -z "$INDEX_FILE" ]; then
-
-              INDEX_FILE=$(find . \
-                -type f \
-                -iname "index.html" \
-                ! -path "./kayan-build/*" \
-                | head -n 1 || true)
-
-            fi
-
-            if [ -z "$INDEX_FILE" ]; then
-              echo "ERROR: index.html not found"
-              exit 1
-            fi
-
-            echo ""
-            echo "index.html FOUND:"
-            echo "$INDEX_FILE"
-
-            cp "$INDEX_FILE" \
-              "$TARGET_DIR/index.html"
-
-          fi
-
-          echo ""
-          echo "Final index.html:"
-          ls -lh "$TARGET_DIR/index.html"
-
-
-      # ==========================================
-      # 9. CONFIGURE ANDROID SDK PATH
-      # ==========================================
-
       - name: Configure Android SDK
         shell: bash
         run: |
@@ -275,70 +164,78 @@ jobs:
           echo "local.properties:"
           cat "$PROJECT_DIR/local.properties"
 
-
-      # ==========================================
-      # 10. FIX JAVA CODE AUTOMATICALLY
-      # ==========================================
-
-      - name: Fix MainActivity Java
+      - name: Verify Clinical Merge Files
         shell: bash
         run: |
           set -e
 
-          MAIN="$PROJECT_DIR/app/src/main/java/com/kayan/equine/MainActivity.java"
-
-          echo ""
           echo "======================================"
-          echo " FIXING MAINACTIVITY.JAVA"
+          echo " CHECKING MERGED CLINICAL FILES"
           echo "======================================"
 
-          if [ ! -f "$MAIN" ]; then
-            echo "ERROR: MainActivity.java not found"
+          if [ ! -f "$PROJECT_DIR/app/src/main/assets/index.html" ]; then
+            echo "ERROR: Main hospital index.html missing"
             exit 1
           fi
 
-          # Remove Windows CRLF
-          sed -i 's/\r$//' "$MAIN"
-
-          # Fix PrintManager wrong package
-          sed -i \
-            's/import android\.app\.PrintManager;/import android.print.PrintManager;/' \
-            "$MAIN"
-
-          # Also fix if PrintManager import is missing
-          if ! grep -q "import android.print.PrintManager;" "$MAIN"; then
-            sed -i \
-              '/import android.app.Activity;/a import android.print.PrintManager;' \
-              "$MAIN"
+          if [ ! -f "$PROJECT_DIR/app/src/main/assets/clinical.html" ]; then
+            echo "ERROR: Clinical Assistant clinical.html missing"
+            exit 1
           fi
 
-          # Fix invalid MainActivity.super call if it exists
-          sed -i \
-            's/MainActivity\.super\.onBackPressed();/finish();/' \
-            "$MAIN"
+          if [ ! -f "$PROJECT_DIR/app/src/main/assets/computer_backup.json" ]; then
+            echo "ERROR: Hospital database backup missing"
+            exit 1
+          fi
 
           echo ""
-          echo "PrintManager check:"
-          grep "PrintManager" "$MAIN" || true
+          echo "Main Hospital App:"
+          ls -lh "$PROJECT_DIR/app/src/main/assets/index.html"
 
           echo ""
-          echo "MainActivity fixed successfully"
+          echo "Clinical Assistant:"
+          ls -lh "$PROJECT_DIR/app/src/main/assets/clinical.html"
 
+          echo ""
+          echo "Hospital Database:"
+          ls -lh "$PROJECT_DIR/app/src/main/assets/computer_backup.json"
 
-      # ==========================================
-      # 11. REPAIR PROJECT FILES
-      # ==========================================
+          echo ""
+          echo "MERGED FILES VERIFIED"
 
-      - name: Repair Android Project Files
+      - name: Fix Java Files
+        shell: bash
+        run: |
+          set -e
+
+          echo "======================================"
+          echo " FIXING JAVA FILES"
+          echo "======================================"
+
+          find "$PROJECT_DIR/app/src/main/java" \
+            -type f \
+            -name "*.java" \
+            -exec sed -i 's/\r$//' {} \;
+
+          find "$PROJECT_DIR/app/src/main/java" \
+            -type f \
+            -name "*.java" \
+            -exec sed -i \
+            's/import android\.app\.PrintManager;/import android.print.PrintManager;/' \
+            {} \;
+
+          echo ""
+          echo "Java files repaired"
+
+      - name: Repair Gradle Files
         shell: bash
         run: |
           set -e
 
           cd "$PROJECT_DIR"
 
-          echo ""
           echo "======================================"
-          echo " REPAIRING ANDROID PROJECT"
+          echo " REPAIRING GRADLE PROJECT"
           echo "======================================"
 
           find . \
@@ -348,30 +245,66 @@ jobs:
             -o -name "*.xml" \) \
             -exec sed -i 's/\r$//' {} \; || true
 
-          # Remove broken wrapper
           rm -f gradlew
           rm -f gradlew.bat
 
           echo ""
-          echo "Using GitHub Gradle 8.9"
+          echo "Using Gradle 8.9 installed by GitHub"
 
+      - name: Ensure Java Compatibility
+        shell: bash
+        run: |
+          set -e
 
-      # ==========================================
-      # 12. VERIFY PROJECT
-      # ==========================================
+          BUILD_FILE="$PROJECT_DIR/app/build.gradle"
 
-      - name: Verify Kayan Android Project
+          if [ -f "$BUILD_FILE" ]; then
+
+            if ! grep -q "sourceCompatibility" "$BUILD_FILE"; then
+
+              python3 - <<'PY'
+          import os
+
+          p = os.environ["PROJECT_DIR"] + "/app/build.gradle"
+
+          text = open(p, encoding="utf-8").read()
+
+          marker = "android {"
+
+          insert = """
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          """
+
+          if marker in text:
+              text = text.replace(
+                  marker,
+                  marker + insert,
+                  1
+              )
+
+          open(p, "w", encoding="utf-8").write(text)
+          PY
+
+            fi
+
+          fi
+
+          echo ""
+          echo "Java compatibility configured"
+
+      - name: Verify Android Project
         shell: bash
         run: |
           set -e
 
           cd "$PROJECT_DIR"
 
-          echo ""
           echo "======================================"
-          echo " VERIFYING KAYAN PROJECT"
+          echo " VERIFYING PROJECT"
           echo "======================================"
-          echo ""
 
           ls -la
 
@@ -392,8 +325,7 @@ jobs:
             exit 1
           fi
 
-          if [ ! -f "app/build.gradle" ] && \
-             [ ! -f "app/build.gradle.kts" ]; then
+          if [ ! -f "app/build.gradle" ]; then
             echo "ERROR: app/build.gradle missing"
             exit 1
           fi
@@ -403,57 +335,50 @@ jobs:
             exit 1
           fi
 
-          if [ ! -f "app/src/main/assets/www/index.html" ]; then
+          if [ ! -f "app/src/main/assets/index.html" ]; then
             echo "ERROR: index.html missing"
             exit 1
           fi
 
-          if [ ! -f \
-            "app/src/main/java/com/kayan/equine/MainActivity.java" ]; then
-            echo "ERROR: MainActivity.java missing"
+          if [ ! -f "app/src/main/assets/clinical.html" ]; then
+            echo "ERROR: clinical.html missing"
             exit 1
           fi
 
           echo ""
           echo "PROJECT VERIFIED SUCCESSFULLY"
 
-
-      # ==========================================
-      # 13. CHECK ENVIRONMENT
-      # ==========================================
-
-      - name: Check Build Environment
+      - name: Show Build Environment
         shell: bash
         run: |
           echo ""
-          echo "JAVA VERSION"
+          echo "======================================"
+          echo " JAVA"
+          echo "======================================"
           java -version
 
           echo ""
-          echo "GRADLE VERSION"
+          echo "======================================"
+          echo " GRADLE"
+          echo "======================================"
           gradle --version
 
           echo ""
-          echo "ANDROID SDK"
+          echo "======================================"
+          echo " ANDROID SDK"
+          echo "======================================"
           echo "$ANDROID_HOME"
 
-
-      # ==========================================
-      # 14. BUILD APK
-      # ==========================================
-
-      - name: Build Kayan APK
+      - name: Build Kayan V3.5 APK
         shell: bash
         run: |
           set -e
 
           cd "$PROJECT_DIR"
 
-          echo ""
           echo "======================================"
-          echo " BUILDING KAYAN EQUINE APK"
+          echo " BUILDING KAYAN VET V3.5"
           echo "======================================"
-          echo ""
 
           gradle \
             clean \
@@ -463,21 +388,17 @@ jobs:
 
           echo ""
           echo "======================================"
-          echo " BUILD COMPLETED"
+          echo " BUILD COMPLETED SUCCESSFULLY"
           echo "======================================"
-
-
-      # ==========================================
-      # 15. FIND GENERATED APK
-      # ==========================================
 
       - name: Find Generated APK
         shell: bash
         run: |
           set -e
 
-          echo ""
-          echo "Searching for APK..."
+          echo "======================================"
+          echo " SEARCHING FOR APK"
+          echo "======================================"
 
           APK_FILE=$(find "$PROJECT_DIR/app/build/outputs/apk" \
             -type f \
@@ -505,29 +426,20 @@ jobs:
           mkdir -p final-apk
 
           cp "$APK_FILE" \
-            final-apk/Kayan-Equine-Clinical-Assistant.apk
+            final-apk/Kayan-Vet-Hospital-V3.5-Merged-Clinical.apk
 
           echo ""
           echo "======================================"
-          echo " KAYAN EQUINE APK READY"
+          echo " FINAL APK READY"
           echo "======================================"
 
           ls -lh \
-            final-apk/Kayan-Equine-Clinical-Assistant.apk
+            final-apk/Kayan-Vet-Hospital-V3.5-Merged-Clinical.apk
 
-
-      # ==========================================
-      # 16. UPLOAD APK
-      # ==========================================
-
-      - name: Upload Kayan APK
+      - name: Upload Final APK
         uses: actions/upload-artifact@v4
         with:
-
-          name: Kayan-Equine-Clinical-Assistant-APK
-
-          path: final-apk/Kayan-Equine-Clinical-Assistant.apk
-
+          name: Kayan-Vet-Hospital-V3.5-Merged-Clinical-APK
+          path: final-apk/Kayan-Vet-Hospital-V3.5-Merged-Clinical.apk
           if-no-files-found: error
-
           retention-days: 30
