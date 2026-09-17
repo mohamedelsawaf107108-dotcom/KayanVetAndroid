@@ -1,4 +1,4 @@
-name: Build Kayan Vet V3.5 APK
+name: Build KAYAN Equestrian Command APK
 
 on:
   workflow_dispatch:
@@ -11,11 +11,10 @@ permissions:
 
 jobs:
   build:
-    name: Build Kayan V3.5 APK
+    name: Build KAYAN Android APK
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout Repository
         uses: actions/checkout@v4
 
@@ -25,521 +24,566 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK 35
-        shell: bash
-        run: |
-          set -e
-
-          echo "======================================"
-          echo " INSTALLING ANDROID SDK 35"
-          echo "======================================"
-
-          yes | sdkmanager --licenses >/dev/null || true
-
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
-
-          echo ""
-          echo "ANDROID SDK READY"
-          echo "ANDROID_HOME=$ANDROID_HOME"
-
-      - name: Setup Gradle 8.11.1
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.11.1"
+          gradle-version: "8.9"
 
-      - name: Find Kayan V3.5 ZIP
+      - name: Create Complete Android Project
         shell: bash
         run: |
           set -e
-
-          echo "======================================"
-          echo " SEARCHING FOR KAYAN V3.5 ZIP"
-          echo "======================================"
-
-          echo ""
-          echo "Available ZIP files:"
-          find . -type f -iname "*.zip" -print || true
-
-          ZIP_FILE=""
-
-          ZIP_FILE=$(find . -type f \
-            -iname "*V3.5.0*MERGED*CLINICAL*.zip" \
-            | head -n 1 || true)
-
-          if [ -z "$ZIP_FILE" ]; then
-            ZIP_FILE=$(find . -type f \
-              -iname "*V3.5*MERGED*.zip" \
-              | head -n 1 || true)
-          fi
-
-          if [ -z "$ZIP_FILE" ]; then
-            ZIP_FILE=$(find . -type f \
-              -iname "*V3.5*.zip" \
-              | head -n 1 || true)
-          fi
-
-          if [ -z "$ZIP_FILE" ]; then
-            ZIP_FILE=$(find . -type f \
-              -iname "*MERGED*CLINICAL*.zip" \
-              | head -n 1 || true)
-          fi
-
-          if [ -z "$ZIP_FILE" ]; then
-            ZIP_FILE=$(find . -type f \
-              -iname "*KayanVetAndroid*.zip" \
-              | head -n 1 || true)
-          fi
-
-          if [ -z "$ZIP_FILE" ]; then
-            echo ""
-            echo "ERROR: Kayan V3.5 ZIP not found."
-            exit 1
-          fi
-
-          echo ""
-          echo "ZIP FOUND:"
-          echo "$ZIP_FILE"
-
-          echo "ZIP_FILE=$ZIP_FILE" >> "$GITHUB_ENV"
-
-      - name: Extract Kayan Project
-        shell: bash
-        run: |
-          set -e
-
-          echo "======================================"
-          echo " EXTRACTING KAYAN PROJECT"
-          echo "======================================"
-
-          rm -rf kayan-build
-          mkdir -p kayan-build
-
-          unzip -q "$ZIP_FILE" -d kayan-build
-
-          echo ""
-          echo "EXTRACTION COMPLETED"
-
-          echo ""
-          echo "Extracted files:"
-          find kayan-build -maxdepth 6 -type f | head -250
-
-      - name: Locate Android Project
-        shell: bash
-        run: |
-          set -e
-
-          echo "======================================"
-          echo " LOCATING ANDROID PROJECT"
-          echo "======================================"
-
-          SETTINGS_FILE=$(find kayan-build \
-            -type f \
-            -name "settings.gradle" \
-            | head -n 1 || true)
-
-          if [ -z "$SETTINGS_FILE" ]; then
-            SETTINGS_FILE=$(find kayan-build \
-              -type f \
-              -name "settings.gradle.kts" \
-              | head -n 1 || true)
-          fi
-
-          if [ -z "$SETTINGS_FILE" ]; then
-            echo ""
-            echo "ERROR: settings.gradle not found."
-            echo ""
-            echo "Extracted project contents:"
-            find kayan-build -maxdepth 7 -type f | head -300
-            exit 1
-          fi
-
-          PROJECT_DIR=$(dirname "$SETTINGS_FILE")
-
-          echo ""
-          echo "ANDROID PROJECT FOUND:"
-          echo "$PROJECT_DIR"
-
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-      - name: Configure Android SDK
-        shell: bash
-        run: |
-          set -e
-
-          echo "sdk.dir=$ANDROID_HOME" > "$PROJECT_DIR/local.properties"
-
-          echo ""
-          echo "local.properties:"
-          cat "$PROJECT_DIR/local.properties"
-
-      - name: Normalize Project Files
-        shell: bash
-        run: |
-          set -e
-
-          echo "======================================"
-          echo " NORMALIZING PROJECT FILES"
-          echo "======================================"
-
-          find "$PROJECT_DIR" \
-            -type f \
-            \( \
-              -name "*.gradle" \
-              -o -name "*.gradle.kts" \
-              -o -name "*.java" \
-              -o -name "*.xml" \
-              -o -name "*.properties" \
-              -o -name "*.html" \
-            \) \
-            -exec sed -i 's/\r$//' {} \; || true
-
-          echo ""
-          echo "FILES NORMALIZED"
-
-      - name: Fix MainActivity Java
-        shell: bash
-        run: |
-          set -e
-
-          echo "======================================"
-          echo " FIXING MAINACTIVITY"
-          echo "======================================"
-
-          MAIN=$(find "$PROJECT_DIR/app/src/main/java" \
-            -type f \
-            -name "MainActivity.java" \
-            | head -n 1 || true)
-
-          if [ -z "$MAIN" ]; then
-            echo "ERROR: MainActivity.java not found."
-            exit 1
-          fi
-
-          echo "MainActivity found:"
-          echo "$MAIN"
-
-          sed -i 's/\r$//' "$MAIN"
-
-          sed -i \
-            's/import android\.app\.PrintManager;/import android.print.PrintManager;/' \
-            "$MAIN"
-
-          sed -i \
-            's/MainActivity\.super\.onBackPressed();/finish();/' \
-            "$MAIN"
-
-          echo ""
-          echo "PrintManager check:"
-          grep -n "PrintManager" "$MAIN" || true
-
-          echo ""
-          echo "MAINACTIVITY FIX COMPLETED"
-
-      - name: Verify Merged Clinical Files
-        shell: bash
-        run: |
-          set -e
-
-          echo "======================================"
-          echo " VERIFYING MERGED APP FILES"
-          echo "======================================"
-
-          ASSETS="$PROJECT_DIR/app/src/main/assets"
-
-          mkdir -p "$ASSETS"
-
-          echo ""
-          echo "Current assets:"
-          find "$ASSETS" -maxdepth 3 -type f -print || true
-
-          if [ ! -f "$ASSETS/index.html" ]; then
-
-            echo ""
-            echo "index.html not in assets."
-            echo "Searching project..."
-
-            INDEX=$(find "$PROJECT_DIR" \
-              -type f \
-              -name "index.html" \
-              | head -n 1 || true)
-
-            if [ -n "$INDEX" ]; then
-
-              echo "Found:"
-              echo "$INDEX"
-
-              cp "$INDEX" "$ASSETS/index.html"
-
-              echo "index.html copied to Android assets."
-
-            else
-
-              echo "ERROR: index.html not found."
-              exit 1
-
-            fi
-          fi
-
-          echo ""
-          echo "MAIN APP:"
-          ls -lh "$ASSETS/index.html"
-
-          if [ -f "$ASSETS/clinical.html" ]; then
-            echo ""
-            echo "CLINICAL ASSISTANT:"
-            ls -lh "$ASSETS/clinical.html"
-          else
-            echo ""
-            echo "clinical.html not found as separate file."
-            echo "Clinical module may already be inside index.html."
-          fi
-
-          if [ -f "$ASSETS/computer_backup.json" ]; then
-            echo ""
-            echo "DATABASE:"
-            ls -lh "$ASSETS/computer_backup.json"
-          else
-            echo ""
-            echo "computer_backup.json not found as separate asset."
-          fi
-
-          echo ""
-          echo "MERGED APP FILE CHECK COMPLETED"
-
-      - name: Ensure Java 17 Compatibility
-        shell: bash
-        run: |
-          set -e
-
-          BUILD_FILE="$PROJECT_DIR/app/build.gradle"
-
-          if [ -f "$BUILD_FILE" ]; then
-
-            if ! grep -q "sourceCompatibility" "$BUILD_FILE"; then
-
-              python3 - <<'PY'
-          import os
-
-          project = os.environ["PROJECT_DIR"]
-          p = os.path.join(project, "app", "build.gradle")
-
-          with open(p, "r", encoding="utf-8") as f:
-              text = f.read()
-
-          marker = "android {"
-
-          options = """
+          mkdir -p app/src/main/java/com/kayan/equestriancommand
+          mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/drawable
+          mkdir -p app/src/main/res/xml
+
+          cat > settings.gradle <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+
+          rootProject.name = "KAYANEquestrianCommand"
+          include ':app'
+          EOF
+
+          cat > build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application' version '8.7.3' apply false
+          }
+          EOF
+
+          cat > gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          android.nonTransitiveRClass=true
+          EOF
+
+          cat > app/build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application'
+          }
+
+          android {
+              namespace 'com.kayan.equestriancommand'
+              compileSdk 35
+
+              defaultConfig {
+                  applicationId 'com.kayan.equestriancommand'
+                  minSdk 26
+                  targetSdk 35
+                  versionCode 1
+                  versionName '1.0.0'
+              }
+
+              buildTypes {
+                  debug {
+                      applicationIdSuffix '.debug'
+                      versionNameSuffix '-debug'
+                  }
+
+                  release {
+                      minifyEnabled false
+                      proguardFiles getDefaultProguardFile(
+                              'proguard-android-optimize.txt'
+                      ), 'proguard-rules.pro'
+                  }
+              }
 
               compileOptions {
                   sourceCompatibility JavaVersion.VERSION_17
                   targetCompatibility JavaVersion.VERSION_17
               }
+          }
+          EOF
 
-          """
+          cat > app/proguard-rules.pro <<'EOF'
+          -keepclassmembers class * extends android.webkit.WebChromeClient {
+              *;
+          }
 
-          if marker in text:
-              text = text.replace(
-                  marker,
-                  marker + options,
-                  1
-              )
+          -keepclassmembers class * extends android.webkit.WebViewClient {
+              *;
+          }
+          EOF
 
-              with open(p, "w", encoding="utf-8") as f:
-                  f.write(text)
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
 
-              print("Java 17 compileOptions added.")
-          else:
-              print("android block not found.")
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-          PY
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-            else
-              echo "Java compatibility already configured."
-            fi
+              <application
+                  android:allowBackup="false"
+                  android:hardwareAccelerated="true"
+                  android:icon="@drawable/ic_launcher"
+                  android:label="KAYAN Command"
+                  android:networkSecurityConfig="@xml/network_security_config"
+                  android:supportsRtl="true"
+                  android:theme="@style/Theme.Kayan"
+                  android:usesCleartextTraffic="false">
 
-          fi
+                  <activity
+                      android:name=".MainActivity"
+                      android:configChanges="keyboard|keyboardHidden|orientation|screenSize|smallestScreenSize|uiMode"
+                      android:exported="true">
 
-      - name: Verify Android Project
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+
+                  </activity>
+
+              </application>
+
+          </manifest>
+          EOF
+
+          cat > app/src/main/res/xml/network_security_config.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+
+          <network-security-config>
+              <base-config cleartextTrafficPermitted="false" />
+          </network-security-config>
+          EOF
+
+          cat > app/src/main/res/values/colors.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+
+          <resources>
+              <color name="kayan_dark">#04100F</color>
+              <color name="kayan_green">#071B19</color>
+              <color name="kayan_gold">#D8AD59</color>
+          </resources>
+          EOF
+
+          cat > app/src/main/res/values/styles.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+
+          <resources>
+
+              <style
+                  name="Theme.Kayan"
+                  parent="android:style/Theme.Material.Light.NoActionBar">
+
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:windowActionModeOverlay">true</item>
+                  <item name="android:windowLightStatusBar">false</item>
+                  <item name="android:statusBarColor">@color/kayan_dark</item>
+                  <item name="android:navigationBarColor">@color/kayan_dark</item>
+                  <item name="android:windowBackground">@color/kayan_green</item>
+                  <item name="android:colorAccent">@color/kayan_gold</item>
+
+              </style>
+
+          </resources>
+          EOF
+
+          cat > app/src/main/res/drawable/ic_launcher.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+
+          <vector
+              xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp"
+              android:height="108dp"
+              android:viewportWidth="108"
+              android:viewportHeight="108">
+
+              <path
+                  android:fillColor="#071B19"
+                  android:pathData="M0,0h108v108h-108z" />
+
+              <path
+                  android:fillColor="#D8AD59"
+                  android:pathData="M29,84C30,61 42,37 68,24C76,30 82,39 86,48L73,43L69,58C79,64 84,73 84,84H64C64,73 58,67 47,65C43,72 41,78 41,84Z" />
+
+              <path
+                  android:fillColor="#071B19"
+                  android:pathData="M68,34m-3,0a3,3 0,1 0,6 0a3,3 0,1 0,-6 0" />
+
+          </vector>
+          EOF
+
+          cat > app/src/main/java/com/kayan/equestriancommand/MainActivity.java <<'EOF'
+          package com.kayan.equestriancommand;
+
+          import android.annotation.SuppressLint;
+          import android.app.Activity;
+          import android.content.Intent;
+          import android.graphics.Bitmap;
+          import android.graphics.Color;
+          import android.net.Uri;
+          import android.os.Bundle;
+          import android.view.Gravity;
+          import android.view.View;
+          import android.webkit.CookieManager;
+          import android.webkit.ValueCallback;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebResourceError;
+          import android.webkit.WebResourceRequest;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import android.widget.FrameLayout;
+          import android.widget.ProgressBar;
+          import android.widget.TextView;
+
+          public class MainActivity extends Activity {
+
+              private static final String APP_URL =
+                      "https://kayan-equestrian-command.wintry-degu-1733.chatgpt.site";
+
+              private static final int FILE_CHOOSER_REQUEST = 7001;
+
+              private WebView webView;
+              private ProgressBar progressBar;
+              private TextView offlineMessage;
+              private ValueCallback<Uri[]> fileCallback;
+
+              @Override
+              @SuppressLint("SetJavaScriptEnabled")
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+
+                  getWindow().setStatusBarColor(
+                          Color.rgb(4, 16, 15)
+                  );
+
+                  getWindow().setNavigationBarColor(
+                          Color.rgb(4, 16, 15)
+                  );
+
+                  FrameLayout root = new FrameLayout(this);
+
+                  root.setBackgroundColor(
+                          Color.rgb(7, 27, 25)
+                  );
+
+                  createWebView(root);
+                  createProgressBar(root);
+                  createOfflineMessage(root);
+
+                  setContentView(root);
+
+                  configureWebView();
+
+                  if (savedInstanceState == null) {
+                      webView.loadUrl(APP_URL);
+                  } else {
+                      webView.restoreState(savedInstanceState);
+                  }
+              }
+
+              private void createWebView(FrameLayout root) {
+                  webView = new WebView(this);
+
+                  webView.setBackgroundColor(
+                          Color.rgb(7, 27, 25)
+                  );
+
+                  FrameLayout.LayoutParams webParams =
+                          new FrameLayout.LayoutParams(
+                                  FrameLayout.LayoutParams.MATCH_PARENT,
+                                  FrameLayout.LayoutParams.MATCH_PARENT
+                          );
+
+                  root.addView(webView, webParams);
+              }
+
+              private void createProgressBar(FrameLayout root) {
+                  progressBar = new ProgressBar(
+                          this,
+                          null,
+                          android.R.attr.progressBarStyleHorizontal
+                  );
+
+                  progressBar.setMax(100);
+
+                  progressBar.setProgressTintList(
+                          android.content.res.ColorStateList.valueOf(
+                                  Color.rgb(216, 173, 89)
+                          )
+                  );
+
+                  FrameLayout.LayoutParams progressParams =
+                          new FrameLayout.LayoutParams(
+                                  FrameLayout.LayoutParams.MATCH_PARENT,
+                                  8
+                          );
+
+                  root.addView(progressBar, progressParams);
+              }
+
+              private void createOfflineMessage(FrameLayout root) {
+                  offlineMessage = new TextView(this);
+
+                  offlineMessage.setText(
+                          "Connection unavailable\nTap to try again"
+                  );
+
+                  offlineMessage.setTextColor(Color.WHITE);
+                  offlineMessage.setTextSize(18);
+                  offlineMessage.setGravity(Gravity.CENTER);
+
+                  offlineMessage.setBackgroundColor(
+                          Color.rgb(7, 27, 25)
+                  );
+
+                  offlineMessage.setVisibility(View.GONE);
+
+                  offlineMessage.setOnClickListener(view -> {
+                      offlineMessage.setVisibility(View.GONE);
+                      webView.reload();
+                  });
+
+                  FrameLayout.LayoutParams offlineParams =
+                          new FrameLayout.LayoutParams(
+                                  FrameLayout.LayoutParams.MATCH_PARENT,
+                                  FrameLayout.LayoutParams.MATCH_PARENT
+                          );
+
+                  root.addView(offlineMessage, offlineParams);
+              }
+
+              @SuppressLint("SetJavaScriptEnabled")
+              private void configureWebView() {
+                  WebSettings settings = webView.getSettings();
+
+                  settings.setJavaScriptEnabled(true);
+                  settings.setDomStorageEnabled(true);
+                  settings.setDatabaseEnabled(true);
+                  settings.setAllowFileAccess(true);
+                  settings.setAllowContentAccess(true);
+                  settings.setMediaPlaybackRequiresUserGesture(false);
+                  settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+                  settings.setBuiltInZoomControls(false);
+                  settings.setDisplayZoomControls(false);
+
+                  settings.setUserAgentString(
+                          settings.getUserAgentString()
+                                  + " KAYAN-Android/1.0"
+                  );
+
+                  CookieManager cookieManager =
+                          CookieManager.getInstance();
+
+                  cookieManager.setAcceptCookie(true);
+
+                  cookieManager.setAcceptThirdPartyCookies(
+                          webView,
+                          true
+                  );
+
+                  createWebViewClient();
+                  createWebChromeClient();
+              }
+
+              private void createWebViewClient() {
+                  webView.setWebViewClient(
+                          new WebViewClient() {
+
+                              @Override
+                              public boolean shouldOverrideUrlLoading(
+                                      WebView view,
+                                      WebResourceRequest request
+                              ) {
+                                  Uri uri = request.getUrl();
+                                  String scheme = uri.getScheme();
+
+                                  if ("http".equals(scheme)
+                                          || "https".equals(scheme)) {
+                                      return false;
+                                  }
+
+                                  try {
+                                      Intent intent = new Intent(
+                                              Intent.ACTION_VIEW,
+                                              uri
+                                      );
+
+                                      startActivity(intent);
+                                  } catch (Exception ignored) {
+                                  }
+
+                                  return true;
+                              }
+
+                              @Override
+                              public void onPageStarted(
+                                      WebView view,
+                                      String url,
+                                      Bitmap favicon
+                              ) {
+                                  progressBar.setVisibility(View.VISIBLE);
+                                  offlineMessage.setVisibility(View.GONE);
+                              }
+
+                              @Override
+                              public void onPageFinished(
+                                      WebView view,
+                                      String url
+                              ) {
+                                  progressBar.setVisibility(View.GONE);
+                              }
+
+                              @Override
+                              public void onReceivedError(
+                                      WebView view,
+                                      WebResourceRequest request,
+                                      WebResourceError error
+                              ) {
+                                  if (request.isForMainFrame()) {
+                                      offlineMessage.setVisibility(
+                                              View.VISIBLE
+                                      );
+                                  }
+                              }
+                          }
+                  );
+              }
+
+              private void createWebChromeClient() {
+                  webView.setWebChromeClient(
+                          new WebChromeClient() {
+
+                              @Override
+                              public void onProgressChanged(
+                                      WebView view,
+                                      int progress
+                              ) {
+                                  progressBar.setProgress(progress);
+
+                                  progressBar.setVisibility(
+                                          progress >= 100
+                                                  ? View.GONE
+                                                  : View.VISIBLE
+                                  );
+                              }
+
+                              @Override
+                              public boolean onShowFileChooser(
+                                      WebView view,
+                                      ValueCallback<Uri[]> callback,
+                                      FileChooserParams params
+                              ) {
+                                  if (fileCallback != null) {
+                                      fileCallback.onReceiveValue(null);
+                                  }
+
+                                  fileCallback = callback;
+
+                                  try {
+                                      Intent intent =
+                                              params.createIntent();
+
+                                      startActivityForResult(
+                                              intent,
+                                              FILE_CHOOSER_REQUEST
+                                      );
+                                  } catch (Exception error) {
+                                      fileCallback = null;
+                                      return false;
+                                  }
+
+                                  return true;
+                              }
+                          }
+                  );
+              }
+
+              @Override
+              protected void onActivityResult(
+                      int requestCode,
+                      int resultCode,
+                      Intent data
+              ) {
+                  super.onActivityResult(
+                          requestCode,
+                          resultCode,
+                          data
+                  );
+
+                  if (requestCode == FILE_CHOOSER_REQUEST
+                          && fileCallback != null) {
+
+                      Uri[] result =
+                              WebChromeClient.FileChooserParams
+                                      .parseResult(
+                                              resultCode,
+                                              data
+                                      );
+
+                      fileCallback.onReceiveValue(result);
+                      fileCallback = null;
+                  }
+              }
+
+              @Override
+              protected void onSaveInstanceState(Bundle state) {
+                  webView.saveState(state);
+                  super.onSaveInstanceState(state);
+              }
+
+              @Override
+              public void onBackPressed() {
+                  if (webView.canGoBack()) {
+                      webView.goBack();
+                  } else {
+                      super.onBackPressed();
+                  }
+              }
+
+              @Override
+              protected void onDestroy() {
+                  if (webView != null) {
+                      webView.loadUrl("about:blank");
+                      webView.stopLoading();
+                      webView.clearHistory();
+                      webView.removeAllViews();
+                      webView.destroy();
+                  }
+
+                  super.onDestroy();
+              }
+          }
+          EOF
+
+      - name: Build APK
+        run: gradle --no-daemon assembleDebug
+
+      - name: Prepare APK File
         shell: bash
         run: |
-          set -e
+          mkdir -p output
 
-          cd "$PROJECT_DIR"
+          cp \
+            app/build/outputs/apk/debug/app-debug.apk \
+            output/KAYAN-Equestrian-Command.apk
 
-          echo "======================================"
-          echo " VERIFYING ANDROID PROJECT"
-          echo "======================================"
+          sha256sum \
+            output/KAYAN-Equestrian-Command.apk \
+            > output/SHA256.txt
 
-          echo ""
-          echo "Project directory:"
-          pwd
-
-          echo ""
-          echo "Project files:"
-          ls -la
-
-          if [ ! -f "settings.gradle" ] && \
-             [ ! -f "settings.gradle.kts" ]; then
-            echo "ERROR: settings.gradle missing."
-            exit 1
-          fi
-
-          if [ ! -f "build.gradle" ] && \
-             [ ! -f "build.gradle.kts" ]; then
-            echo "ERROR: root build.gradle missing."
-            exit 1
-          fi
-
-          if [ ! -d "app" ]; then
-            echo "ERROR: app folder missing."
-            exit 1
-          fi
-
-          if [ ! -f "app/build.gradle" ] && \
-             [ ! -f "app/build.gradle.kts" ]; then
-            echo "ERROR: app/build.gradle missing."
-            exit 1
-          fi
-
-          if [ ! -f "app/src/main/AndroidManifest.xml" ]; then
-            echo "ERROR: AndroidManifest.xml missing."
-            exit 1
-          fi
-
-          if [ ! -f "app/src/main/assets/index.html" ]; then
-            echo "ERROR: index.html missing."
-            exit 1
-          fi
-
-          echo ""
-          echo "======================================"
-          echo " PROJECT VERIFIED SUCCESSFULLY"
-          echo "======================================"
-
-      - name: Show Gradle Configuration
-        shell: bash
-        run: |
-          echo "======================================"
-          echo " ROOT BUILD.GRADLE"
-          echo "======================================"
-
-          cat "$PROJECT_DIR/build.gradle" 2>/dev/null || true
-
-          echo ""
-          echo "======================================"
-          echo " APP BUILD.GRADLE"
-          echo "======================================"
-
-          cat "$PROJECT_DIR/app/build.gradle" 2>/dev/null || true
-
-          echo ""
-          echo "======================================"
-          echo " SETTINGS.GRADLE"
-          echo "======================================"
-
-          cat "$PROJECT_DIR/settings.gradle" 2>/dev/null || true
-
-      - name: Show Build Environment
-        shell: bash
-        run: |
-          echo "======================================"
-          echo " JAVA VERSION"
-          echo "======================================"
-
-          java -version
-
-          echo ""
-          echo "======================================"
-          echo " GRADLE VERSION"
-          echo "======================================"
-
-          gradle --version
-
-          echo ""
-          echo "======================================"
-          echo " ANDROID SDK"
-          echo "======================================"
-
-          echo "$ANDROID_HOME"
-
-      - name: Build Kayan V3.5 APK
-        shell: bash
-        run: |
-          set -e
-
-          cd "$PROJECT_DIR"
-
-          echo "======================================"
-          echo " BUILDING KAYAN VET V3.5 APK"
-          echo "======================================"
-
-          gradle \
-            clean \
-            assembleDebug \
-            --no-daemon \
-            --stacktrace
-
-          echo ""
-          echo "======================================"
-          echo " APK BUILD COMPLETED SUCCESSFULLY"
-          echo "======================================"
-
-      - name: Find Generated APK
-        shell: bash
-        run: |
-          set -e
-
-          echo "======================================"
-          echo " SEARCHING FOR GENERATED APK"
-          echo "======================================"
-
-          APK_FILE=$(find "$PROJECT_DIR/app/build/outputs/apk" \
-            -type f \
-            -name "*.apk" \
-            | head -n 1 || true)
-
-          if [ -z "$APK_FILE" ]; then
-
-            APK_FILE=$(find "$PROJECT_DIR" \
-              -type f \
-              -name "*.apk" \
-              | head -n 1 || true)
-
-          fi
-
-          if [ -z "$APK_FILE" ]; then
-            echo ""
-            echo "ERROR: APK was not generated."
-            exit 1
-          fi
-
-          echo ""
-          echo "APK FOUND:"
-          echo "$APK_FILE"
-
-          mkdir -p final-apk
-
-          cp "$APK_FILE" \
-            "final-apk/Kayan-Vet-Hospital-V3.5-Merged-Clinical.apk"
-
-          echo ""
-          echo "======================================"
-          echo " FINAL APK READY"
-          echo "======================================"
-
-          ls -lh \
-            "final-apk/Kayan-Vet-Hospital-V3.5-Merged-Clinical.apk"
-
-      - name: Upload Final APK
+      - name: Upload KAYAN APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kayan-Vet-Hospital-V3.5-Merged-Clinical-APK
-          path: final-apk/Kayan-Vet-Hospital-V3.5-Merged-Clinical.apk
+          name: KAYAN-Equestrian-Command-APK
+          path: output/
           if-no-files-found: error
           retention-days: 30
